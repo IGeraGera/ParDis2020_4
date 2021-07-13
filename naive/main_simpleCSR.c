@@ -1,3 +1,4 @@
+/* This method uses one CSR and on CSC table */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -50,6 +51,7 @@ main(int argc, char *argv[]){
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
   /* This currently works for matrices RowsxRows */
   for(int i=0;i<MatC.rows;i++){
+  printf("i %d\n",i);
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC,&start);
