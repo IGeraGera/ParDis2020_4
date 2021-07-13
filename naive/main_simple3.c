@@ -1,4 +1,4 @@
-/* This method uses 2 CSC matrices and extracts the main row for the multiplication */
+/* This method uses 2 CSC matrices and uses a better method by iterating the CSC matrices */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -50,68 +50,43 @@ main(int argc, char *argv[]){
   struct timespec ts_end;
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
   /* This currently works for matrices RowsxRows */
-  for(int i=0;i<MatC.rows;i++){
-  struct timespec start;
-  struct timespec end;
-  clock_gettime(CLOCK_MONOTONIC,&start);
-    /* Extract row from CSC MatA */
-    int *curr_row=NULL; // Contains colums numbers for each row
-    int row_elements=0;
-    for(int s=0;s<MatA.nnz;s++){
-      /* Check csc_r if row matches then check from column  */
-      if (MatA.csc_r[s]==i){
-        /* Get Column */
-	//int curr_col = -1;
-	for (int c=0;c<MatA.rows;c++){
-	  //curr_col+=MatA.csc_c[c+1]-MatA.csc_c[c];
-	  //if (curr_col>=c) break;
-	  if (MatA.csc_c[c+1]>s) {
-	    /*realloc row elements and add the corresponding column */
-	    row_elements++;
-	    curr_row = (int *)realloc(curr_row,row_elements*sizeof(int));
-  	    if (curr_row==NULL){
-              fprintf(stderr,"Line %d: Cannot allocate memory\n",__LINE__);
-	      exit(EXIT_FAILURE);
-	    }
-            curr_row[row_elements-1] = c;
-            break;
-	  }
-        }     
+  for(int j=0;j<MatC.rows;j++){
+    if (j%1000==0) printf("%d\n",j);
+    //struct timespec start;
+    //struct timespec end;
+    //clock_gettime(CLOCK_MONOTONIC,&start);
+    int *hits = (int *)calloc(MatC.rows,sizeof(int));
+    if(hits==NULL){
+      fprintf(stderr,"Line %d: Error Alocating Matrix hits",__LINE__);
+      exit(EXIT_FAILURE);
+    }
+    /* Iterate B column */
+    for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
+      int MatArow=MatB.csc_r[c];
+      for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
+        /* check if exist */
+	int i = MatA.csc_r[r];
+	if (hits[i]==0){
+	  hits[i]=1;
+	  MatC.nnz ++;
+          MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
+	  MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
+  	  if (MatC.coo_c == NULL || MatC.coo_r==NULL)
+    	    {fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
+     	     exit(EXIT_FAILURE);}
+	  MatC.coo_r[MatC.nnz-1] = i;
+          MatC.coo_c[MatC.nnz-1] = j;
+
+	}
+
       }
     }
-    //printf("Row %d elements %d -  ",i,row_elements);
-    //for (int t=0;t<row_elements;t++)printf("%d ",curr_row[t]);
-    //puts("\n");
-    
-    /*  MatA * MatB */
-    /*Multiply for each column of MatB */
-    for (int j=0;j<MatC.rows;j++){
-      /* Get elements in column from csc_c */    
-      int MatAIndex=0;
-      int MatBIndex=MatB.csc_c[j];
-      while(MatAIndex<row_elements && MatBIndex<MatB.csc_c[j+1]){
-	/* Check on every element from MatA row  */      
-	if (curr_row[MatAIndex]>MatB.csc_r[MatBIndex]) MatBIndex ++;
-	else if (curr_row[MatAIndex]<MatB.csc_r[MatBIndex]) MatAIndex ++;
-	else if (curr_row[MatAIndex]==MatB.csc_r[MatBIndex]){
-	  	MatC.nnz ++;
-		MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
-		MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
-  		if (MatC.coo_c == NULL || MatC.coo_r==NULL)
-    		  {fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
-     		  exit(EXIT_FAILURE);}
-		MatC.coo_r[MatC.nnz-1] = i;
-		MatC.coo_c[MatC.nnz-1] = j;
-		break;
-	  }
-      }
-    }
-    free(curr_row);
-  clock_gettime(CLOCK_MONOTONIC,&end);
-  double sec,nsec;
-  sec = end.tv_sec - start.tv_sec;
-  nsec = end.tv_nsec - start.tv_nsec;
-  printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
+    free(hits);
+  //clock_gettime(CLOCK_MONOTONIC,&end);
+  //double sec,nsec;
+  //sec = end.tv_sec - start.tv_sec;
+  //nsec = end.tv_nsec - start.tv_nsec;
+  //printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
   }
   clock_gettime(CLOCK_MONOTONIC,&ts_end);
   double ts_sec,ts_nsec;

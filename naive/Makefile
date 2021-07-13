@@ -21,6 +21,12 @@ main_simple2: mmio.o main_simple2.o
 main_simple2.o: main_simple2.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_simple2.c
 
+main_simple3: mmio.o main_simple3.o
+	$(CC) $(CFLAGS) -o $@ mmio.o main_simple3.o
+
+main_simple3.o: main_simple3.c inc/mmio.h
+	$(CC) $(CFLAGS) -c main_simple3.c
+
 main_simpleCSR: mmio.o main_simpleCSR.o
 	$(CC) $(CFLAGS) -o $@ mmio.o main_simpleCSR.o
 
@@ -40,6 +46,8 @@ clean:
 	-rm -f main_simple
 	-rm -f main_simple2.o
 	-rm -f main_simple2
+	-rm -f main_simple3.o
+	-rm -f main_simple3
 	-rm -f main_simpleCSR.o
 	-rm -f main_simpleCSR
 
