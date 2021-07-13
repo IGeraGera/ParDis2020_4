@@ -24,7 +24,7 @@ typedef struct cooMatrix{
 void checkArgsNum(int argc);
 void coo2csc(int * const row,int * const col,int const * const row_coo,
              int const * const col_coo,int const nnz,int const n,int const isOneBased);
-cscMat readFile(char *filename);
+cscMat readFile(char *filename,const int isCSC);
 cooMat sortMat(cooMat Matrix);
 
 /* <<< --- MAIN --- >>> */
@@ -34,10 +34,10 @@ main(int argc, char *argv[]){
   checkArgsNum(argc);
   /* Get MatA */
   cscMat MatA;
-  MatA = readFile(argv[1]);
+  MatA = readFile(argv[1],0);
   /* Get MatB */
   cscMat MatB;
-  MatB = readFile(argv[2]);
+  MatB = readFile(argv[2],1);
   /* Init MatC*/
   cooMat MatC;
   MatC.rows=MatA.rows;
@@ -53,44 +53,15 @@ main(int argc, char *argv[]){
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC,&start);
-    /* Extract row from CSC MatA */
-    int *curr_row=NULL; // Contains colums numbers for each row
-    int row_elements=0;
-    for(int s=0;s<MatA.nnz;s++){
-      /* Check csc_r if row matches then check from column  */
-      if (MatA.csc_r[s]==i){
-        /* Get Column */
-	//int curr_col = -1;
-	for (int c=0;c<MatA.rows;c++){
-	  //curr_col+=MatA.csc_c[c+1]-MatA.csc_c[c];
-	  //if (curr_col>=c) break;
-	  if (MatA.csc_c[c+1]>s) {
-	    /*realloc row elements and add the corresponding column */
-	    row_elements++;
-	    curr_row = (int *)realloc(curr_row,row_elements*sizeof(int));
-  	    if (curr_row==NULL){
-              fprintf(stderr,"Line %d: Cannot allocate memory\n",__LINE__);
-	      exit(EXIT_FAILURE);
-	    }
-            curr_row[row_elements-1] = c;
-            break;
-	  }
-        }     
-      }
-    }
-    //printf("Row %d elements %d -  ",i,row_elements);
-    //for (int t=0;t<row_elements;t++)printf("%d ",curr_row[t]);
-    //puts("\n");
-    
     /*  MatA * MatB */
     /*Multiply for each column of MatB */
     for (int j=0;j<MatC.rows;j++){
-      int matchfound=0;
-      /* Get elements in column from csc_c */    
-      for(int s=MatB.csc_c[j];s<MatB.csc_c[j+1];s++){
-	/* Check on every element from MatA row  */      
-        for(int k=0;k<row_elements;k++){
-	  if (curr_row[k]==MatB.csc_r[s]){
+      int MatAIndex=MatA.csc_c[i];
+      int MatBIndex=MatB.csc_c[j];
+      while(MatAIndex<MatA.csc_c[i+1] && MatBIndex<MatB.csc_c[j+1]){
+     	if (MatA.csc_r[MatAIndex]>MatB.csc_r[MatBIndex]) MatBIndex++;	 
+	else if (MatA.csc_r[MatAIndex]<MatB.csc_r[MatBIndex]) MatAIndex++;	 
+	  if (MatA.csc_r[MatAIndex]==MatB.csc_r[MatBIndex]){
 	  	MatC.nnz ++;
 		MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
 		MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
@@ -99,14 +70,11 @@ main(int argc, char *argv[]){
      		  exit(EXIT_FAILURE);}
 		MatC.coo_r[MatC.nnz-1] = i;
 		MatC.coo_c[MatC.nnz-1] = j;
-		matchfound=1;
 		break;
 	  }
-	}
-      if (matchfound==1) break;
+      
       }
     }
-    free(curr_row);
   clock_gettime(CLOCK_MONOTONIC,&end);
   double sec,nsec;
   sec = end.tv_sec - start.tv_sec;
@@ -132,9 +100,9 @@ main(int argc, char *argv[]){
   puts("\n");
   for (int i =0 ;i<MatB.rows+1;i++) printf("%d ",MatB.csc_c[i]);
   puts("\n");
-  puts("\nMATRIX C\n");
-  for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]);
   */
+  puts("\nMATRIX C\n");
+  for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i]+1,MatC.coo_c[i]+1);
   
 
 
@@ -174,7 +142,7 @@ sortMat(cooMat Matrix){
 }
 
 cscMat
-readFile(char *filename){
+readFile(char *filename,int const isCSC){
   FILE *f;
   int M,N,nz,ret;
   MM_typecode matcode;
@@ -232,8 +200,9 @@ readFile(char *filename){
     printf("Memory allocation at line %d Failed\n",__LINE__);
     exit(EXIT_FAILURE);
   }
-  /* Conversion */	
-  coo2csc(csc_r,csc_c,coo_rows,coo_cols,nnz,row,isOneBased);
+  /* Conversion Check for CSC or CSR*/	
+  if (isCSC==1) coo2csc(csc_r,csc_c,coo_rows,coo_cols,nnz,row,isOneBased);
+  else coo2csc(csc_r,csc_c,coo_cols,coo_rows,nnz,row,isOneBased);
   /*Allocate Memory for Matix Stuct */
   cscMat Matrix; 
   Matrix.csc_r = csc_r;

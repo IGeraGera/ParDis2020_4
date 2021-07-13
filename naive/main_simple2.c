@@ -85,12 +85,14 @@ main(int argc, char *argv[]){
     /*  MatA * MatB */
     /*Multiply for each column of MatB */
     for (int j=0;j<MatC.rows;j++){
-      int matchfound=0;
       /* Get elements in column from csc_c */    
-      for(int s=MatB.csc_c[j];s<MatB.csc_c[j+1];s++){
+      int MatAIndex=0;
+      int MatBIndex=MatB.csc_c[j];
+      while(MatAIndex<row_elements && MatBIndex<MatB.csc_c[j+1]){
 	/* Check on every element from MatA row  */      
-        for(int k=0;k<row_elements;k++){
-	  if (curr_row[k]==MatB.csc_r[s]){
+	if (curr_row[MatAIndex]>MatB.csc_r[MatBIndex]) MatBIndex ++;
+	else if (curr_row[MatAIndex]<MatB.csc_r[MatBIndex]) MatAIndex ++;
+	else if (curr_row[MatAIndex]==MatB.csc_r[MatBIndex]){
 	  	MatC.nnz ++;
 		MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
 		MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
@@ -99,11 +101,8 @@ main(int argc, char *argv[]){
      		  exit(EXIT_FAILURE);}
 		MatC.coo_r[MatC.nnz-1] = i;
 		MatC.coo_c[MatC.nnz-1] = j;
-		matchfound=1;
 		break;
 	  }
-	}
-      if (matchfound==1) break;
       }
     }
     free(curr_row);
@@ -132,9 +131,9 @@ main(int argc, char *argv[]){
   puts("\n");
   for (int i =0 ;i<MatB.rows+1;i++) printf("%d ",MatB.csc_c[i]);
   puts("\n");
+  */
   puts("\nMATRIX C\n");
   for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]);
-  */
   
 
 
