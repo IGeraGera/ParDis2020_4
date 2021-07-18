@@ -33,6 +33,12 @@ main_simpleCSR: mmio.o main_simpleCSR.o
 main_simpleCSR.o: main_simpleCSR.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_simpleCSR.c
 
+main_4R_LUT: mmio.o main_4R_LUT.o
+	$(CC) $(CFLAGS) -o $@ mmio.o main_4R_LUT.o
+
+main_4R_LUT.o: main_4R_LUT.c inc/mmio.h
+	$(CC) $(CFLAGS) -c main_4R_LUT.c
+
 mmio.o: inc/mmio.c
 	$(CC) $(CFLAGS) -c inc/mmio.c
 
@@ -44,6 +50,8 @@ clean:
 	-rm -f main
 	-rm -f main_simple.o
 	-rm -f main_simple
+	-rm -f main_simple_4R_LUT.o
+	-rm -f main_simple_4R_LUT
 	-rm -f main_simple2.o
 	-rm -f main_simple2
 	-rm -f main_simple3.o

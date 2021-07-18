@@ -1,4 +1,4 @@
-/* This method uses 2 CSC matrices and uses a better method by iterating the CSC matrices */
+/* This method uses 2 CSC matrices and a LUT method*/
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -45,29 +45,67 @@ main(int argc, char *argv[]){
   MatC.nnz=0;
   MatC.coo_r=NULL;
   MatC.coo_c=NULL;
+  /* 4Russians variables */
+  int b = 10; //Block Size
+  int **MatA_LUT = (int **)malloc(MatA.rows*sizeof(int *));
+  for (int i=0;i<MatA.rows;i++) MatA_LUT[i] = NULL;
+  int *MatA_LUT_size = (int *)calloc(MatA.rows,sizeof(int));
+  if(MatA_LUT==NULL || MatA_LUT_size==NULL){
+    fprintf(stderr,"Line %d: Error Allocating LUT\n",__LINE__);
+    exit(EXIT_FAILURE);
+  }
+  int **MatB_LUT = (int **)malloc(MatB.rows*sizeof(int *));
+  for (int i=0;i<MatB.rows;i++) MatB_LUT[i] = NULL;
+  int *MatB_LUT_size = (int *)calloc(MatB.rows,sizeof(int));
+  if(MatB_LUT==NULL || MatB_LUT_size==NULL){
+    fprintf(stderr,"Line %d: Error Allocating LUT\n",__LINE__);
+    exit(EXIT_FAILURE);
+  }
+
   /* Timing variables< */
   struct timespec ts_start;
   struct timespec ts_end;
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
+  /* Calc LUT of MatB */
+  for(int j=0;j<MatA.rows;j++){
+    for(int r=MatB.csc_c[j];r<MatB.csc_c[j+1];r++){
+       int i = MatB.csc_r[r];
+       MatB_LUT_size[i]++;
+       MatB_LUT[i]=(int *)realloc(MatB_LUT[i],MatB_LUT_size[i]*sizeof(int));
+       if(MatB_LUT[i]==NULL){
+         fprintf(stderr,"Line %d: Error Allocating LUT\n",__LINE__);
+	 exit(EXIT_FAILURE);
+       }
+       MatB_LUT[i][MatB_LUT_size[i]-1] = j;
+    }
+  }
+  for(int j=0;j<MatA.rows;j++){
+    for(int r=MatA.csc_c[j];r<MatA.csc_c[j+1];r++){
+       int i = MatA.csc_r[r];
+       MatA_LUT_size[i]++;
+       MatA_LUT[i]=(int *)realloc(MatA_LUT[i],MatA_LUT_size[i]*sizeof(int));
+       if(MatA_LUT[i]==NULL){
+         fprintf(stderr,"Line %d: Error Allocating LUT\n",__LINE__);
+	 exit(EXIT_FAILURE);
+       }
+       MatA_LUT[i][MatA_LUT_size[i]-1] = j;
+    }
+  }
+
   /* This currently works for matrices RowsxRows */
-  for(int j=0;j<MatC.rows;j++){
-    //if (j%1000==0) printf("%d\n",j);
+  for(int Ai=0;Ai<MatA.rows;Ai++){
+    //if(Ai%1000==0) printf("%d\n",Ai);
     //struct timespec start;
     //struct timespec end;
     //clock_gettime(CLOCK_MONOTONIC,&start);
     int *hits = (int *)calloc(MatC.rows,sizeof(int));
-    if(hits==NULL){
-      fprintf(stderr,"Line %d: Error Alocating Matrix hits",__LINE__);
-      exit(EXIT_FAILURE);
-    }
-    /* Iterate B column */
-    for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
-      int MatArow=MatB.csc_r[c];
-      for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
-        /* check if exist */
-	int i = MatA.csc_r[r];
-	if (hits[i]==0){
-	  hits[i]=1;
+    int i = Ai;
+    for(int Aj=0;Aj<MatA_LUT_size[Ai];Aj++){
+      int Bi = MatA_LUT[Ai][Aj];
+      for (int Bj=0;Bj<MatB_LUT_size[Bi];Bj++){
+        int j = MatB_LUT[Bi][Bj];
+        if (hits[j]==0){
+          hits[i]=1;
 	  MatC.nnz ++;
           MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
 	  MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
@@ -76,18 +114,21 @@ main(int argc, char *argv[]){
      	     exit(EXIT_FAILURE);}
 	  MatC.coo_r[MatC.nnz-1] = i;
           MatC.coo_c[MatC.nnz-1] = j;
-
 	}
-
-      }
-    }
+      } 
+    }    
     free(hits);
+  }
+  free(MatA_LUT);
+  free(MatA_LUT_size);
+  free(MatB_LUT);
+  free(MatB_LUT_size);
+
   //clock_gettime(CLOCK_MONOTONIC,&end);
   //double sec,nsec;
   //sec = end.tv_sec - start.tv_sec;
   //nsec = end.tv_nsec - start.tv_nsec;
   //printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
-  }
   clock_gettime(CLOCK_MONOTONIC,&ts_end);
   double ts_sec,ts_nsec;
   ts_sec = ts_end.tv_sec - ts_start.tv_sec;
