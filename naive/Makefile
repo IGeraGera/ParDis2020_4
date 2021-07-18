@@ -50,8 +50,8 @@ clean:
 	-rm -f main
 	-rm -f main_simple.o
 	-rm -f main_simple
-	-rm -f main_simple_4R_LUT.o
-	-rm -f main_simple_4R_LUT
+	-rm -f main_4R_LUT.o
+	-rm -f main_4R_LUT
 	-rm -f main_simple2.o
 	-rm -f main_simple2
 	-rm -f main_simple3.o
