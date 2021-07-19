@@ -119,6 +119,10 @@ main(int argc, char *argv[]){
     }    
     free(hits);
   }
+  for (int i=0;i<MatB.rows;i++) {
+	  free(MatB_LUT[i]);
+	  free(MatA_LUT[i]);
+  }
   free(MatA_LUT);
   free(MatA_LUT_size);
   free(MatB_LUT);
