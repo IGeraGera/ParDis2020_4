@@ -1,7 +1,10 @@
 CC=gcc
 CFLAGS=-O3 -std=c99
+DBFLAGS=-O0 -std=c99 -g
 
 all: main main_simple
+
+debug: main_4R_LUT_db 
 
 main: mmio.o main.o
 	$(CC) $(CFLAGS) -o $@ mmio.o main.o
@@ -34,13 +37,21 @@ main_simpleCSR.o: main_simpleCSR.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_simpleCSR.c
 
 main_4R_LUT: mmio.o main_4R_LUT.o
-	$(CC) $(CFLAGS) -o $@ mmio.o main_4R_LUT.o
+	$(CC) $(CFLAGS) -o $@ mmio.o main_4R_LUT.o 
 
 main_4R_LUT.o: main_4R_LUT.c inc/mmio.h
-	$(CC) $(CFLAGS) -c main_4R_LUT.c
+	$(CC) $(CFLAGS) -c main_4R_LUT.c 
 
 mmio.o: inc/mmio.c
 	$(CC) $(CFLAGS) -c inc/mmio.c
+
+# Debug Area
+
+main_4R_LUT_db: mmio.o main_4R_LUT_db.o
+	$(CC) $(DBFLAGS) -o $@ mmio.o main_4R_LUT_db.o 
+
+main_4R_LUT_db.o: main_4R_LUT.c inc/mmio.h
+	$(CC) $(DBLAGS) -o $@ -c main_4R_LUT.c 
 
 .PHONY: clean
 
@@ -58,4 +69,7 @@ clean:
 	-rm -f main_simple3
 	-rm -f main_simpleCSR.o
 	-rm -f main_simpleCSR
+	-rm -f main_4R_LUT_db.o
+	-rm -f main_4R_LUT_db
+
 
