@@ -1,4 +1,7 @@
-/* This method uses 2 CSC matrices and uses a better method by iterating the CSC matrices */
+/* This method uses 2 CSC matrices and iterates the CSC matrices.
+ * It iterates each columns of the B matrix and multiplies the with the elements
+ * of matrix A. The program calculates the result by each column of result matrix C.
+ * The implementation is sped up by OpenMP. Each thread is responsible for one column of B. */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
