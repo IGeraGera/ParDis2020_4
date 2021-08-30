@@ -15,7 +15,7 @@ main_simple3.o: main_simple3.c inc/mmio.h
 main_mpi: mmio.o main_mpi.o
 	$(MPICC) $(CFLAGS) -o $@ mmio.o main_mpi.o
 
-main_mpi: main_mpi.c inc/mmio.h
+main_mpi.o: main_mpi.c inc/mmio.h
 	$(MPICC) $(CFLAGS) -c main_mpi.c
 
 #---------------------------------------------
