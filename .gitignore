@@ -1,8 +1,10 @@
+# DIRECTORIES
 data
 naive/russians
 naive/main
+# FILES
+*main_simple3
 .*.swp
 *.md
 *.swp
 *.o
-
