@@ -65,13 +65,15 @@ main(int argc, char *argv[]){
     }
 	printf("%d\n",j);
     /* Iterate B column */
-    #pragma omp parallel for schedule(dynamic) reduction(+:hits[:MatC.rows])
+    int currj=0;
+    #pragma omp parallel for schedule(dynamic) private(currj) reduction(+:hits[:MatC.rows])
     for (int c=MatB.csc_c[j];c<MatB.csc_c[j+block];c++){
       int MatArow=MatB.csc_r[c];
       for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
 	int i = MatA.csc_r[r];
-	//hits[i+MatC.rows*(j%block)]+=1;
+	hits[i+MatC.rows*currj]+=1;
       }
+      currj++;
     }
     // TODO: Fix the exit memory allocation
     for(int i=0;i<MatC.rows*block;i++){
