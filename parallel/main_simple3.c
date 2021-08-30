@@ -52,6 +52,7 @@ main(int argc, char *argv[]){
   struct timespec ts_end;
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
   /* This currently works for matrices RowsxRows */
+  #pragma omp parallel for
   for(int j=0;j<MatC.rows;j++){
     //if (j%1000==0) printf("%d\n",j);
     //struct timespec start;
@@ -62,18 +63,18 @@ main(int argc, char *argv[]){
       fprintf(stderr,"Line %d: Error Alocating Matrix hits",__LINE__);
       exit(EXIT_FAILURE);
     }
-	if (j%1000==0)printf("%d\n",j);
     /* Iterate B column */
 
-    #pragma omp parallel for schedule(dynamic)
     for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
       int MatArow=MatB.csc_r[c];
       for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
 	int i = MatA.csc_r[r];
-	//hits[i]+=1;
+	hits[i]+=1;
       }
     }
-    // TODO: Fix the exit memory allocation
+    /* Allocate memory */
+    #pragma omp critical
+    {
     for(int i=0;i<MatC.rows;i++){
       if(hits[i]>0){
       MatC.nnz ++;
@@ -85,6 +86,7 @@ main(int argc, char *argv[]){
       MatC.coo_c[MatC.nnz-1] = j;
       MatC.coo_r[MatC.nnz-1] = i;
       }
+    }
     }
     free(hits);
   //clock_gettime(CLOCK_MONOTONIC,&end);
