@@ -55,7 +55,7 @@ main(int argc, char *argv[]){
   int ** totalHits = (int **)malloc(MatC.rows  * sizeof(int *));
   #pragma omp parallel for 
   for(int j=0;j<MatC.rows;j++){
-    if (j%10000==0) printf("%d %d\n",j,omp_get_num_threads());
+    //if (j%10000==0) printf("%d %d\n",j,omp_get_num_threads());
     //struct timespec start;
     //struct timespec end;
     //clock_gettime(CLOCK_MONOTONIC,&start);
@@ -135,6 +135,9 @@ main(int argc, char *argv[]){
 
 
 
+  /* Free arrays allocated for omp */
+  for (int i=0;i<MatC.rows;i++) free(finalHits[i]);
+  free(finalHits);
   /* Free csc arrays allocated from readFile(...)  */
   free(MatA.csc_r);
   free(MatA.csc_c);
