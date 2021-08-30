@@ -52,9 +52,10 @@ main(int argc, char *argv[]){
   struct timespec ts_end;
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
   /* This currently works for matrices RowsxRows */
-  #pragma omp parallel for
+  int ** totalHits = (int **)malloc(MatC.rows  * sizeof(int *));
+  #pragma omp parallel for 
   for(int j=0;j<MatC.rows;j++){
-    //if (j%1000==0) printf("%d\n",j);
+    if (j%10000==0) printf("%d %d\n",j,omp_get_num_threads());
     //struct timespec start;
     //struct timespec end;
     //clock_gettime(CLOCK_MONOTONIC,&start);
@@ -65,29 +66,25 @@ main(int argc, char *argv[]){
     }
     /* Iterate B column */
 
+    int * finalHits = NULL;
+    int nnz=0;
     for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
       int MatArow=MatB.csc_r[c];
       for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
 	int i = MatA.csc_r[r];
-	hits[i]+=1;
+	if(hits[i]==0){
+	nnz++;
+	hits[i]=1;
+        finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
+	finalHits[nnz-1] = i;
+	}
       }
     }
-    /* Allocate memory */
-    #pragma omp critical
-    {
-    for(int i=0;i<MatC.rows;i++){
-      if(hits[i]>0){
-      MatC.nnz ++;
-      MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
-      MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
-      if (MatC.coo_c == NULL || MatC.coo_r==NULL)
-        {fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
-          exit(EXIT_FAILURE);}
-      MatC.coo_c[MatC.nnz-1] = j;
-      MatC.coo_r[MatC.nnz-1] = i;
-      }
-    }
-    }
+    nnz++;
+    finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
+    finalHits[nnz-1] = -1;
+
+    totalHits[j]=finalHits;
     free(hits);
   //clock_gettime(CLOCK_MONOTONIC,&end);
   //double sec,nsec;
@@ -95,6 +92,22 @@ main(int argc, char *argv[]){
   //nsec = end.tv_nsec - start.tv_nsec;
   //printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
   }
+    /* Allocate memory */
+  //TODO: free finalHits and total hits
+   for(int j=0;j<MatC.rows;j++){
+      int nnz= 0;
+      while(totalHits[j][nnz]!=-1) {
+        MatC.nnz ++;
+        MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
+        MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
+        if (MatC.coo_c == NULL || MatC.coo_r==NULL)
+          {fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
+            exit(EXIT_FAILURE);}
+        MatC.coo_c[MatC.nnz-1] = j;
+        MatC.coo_r[MatC.nnz-1] = totalHits[j][nnz];
+        nnz++;
+        }
+      }
   clock_gettime(CLOCK_MONOTONIC,&ts_end);
   double ts_sec,ts_nsec;
   ts_sec = ts_end.tv_sec - ts_start.tv_sec;
