@@ -3,6 +3,7 @@ data
 naive/russians
 naive/main
 # FILES
+*main_mpi
 *main_simple3
 .*.swp
 *.md
