@@ -52,27 +52,29 @@ main(int argc, char *argv[]){
   struct timespec ts_end;
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
   /* This currently works for matrices RowsxRows */
-  for(int j=0;j<MatC.rows;j++){
+  int block = 30000;
+  for(int j=0;j<MatC.rows;j+=block){
     //if (j%1000==0) printf("%d\n",j);
     //struct timespec start;
     //struct timespec end;
     //clock_gettime(CLOCK_MONOTONIC,&start);
-    int *hits = (int *)calloc(MatC.rows,sizeof(int));
+    int *hits = (int *)calloc(MatC.rows*block,sizeof(int));
     if(hits==NULL){
       fprintf(stderr,"Line %d: Error Alocating Matrix hits",__LINE__);
       exit(EXIT_FAILURE);
     }
+	printf("%d\n",j);
     /* Iterate B column */
-    #pragma omp parallel for schedule(static,1) reduction(+:hits[:MatC.rows])
-    for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
+    #pragma omp parallel for schedule(dynamic) reduction(+:hits[:MatC.rows])
+    for (int c=MatB.csc_c[j];c<MatB.csc_c[j+block];c++){
       int MatArow=MatB.csc_r[c];
       for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
 	int i = MatA.csc_r[r];
-	hits[i]+=1;
+	//hits[i+MatC.rows*(j%block)]+=1;
       }
     }
     // TODO: Fix the exit memory allocation
-    for(int i=0;i<MatC.rows;i++){
+    for(int i=0;i<MatC.rows*block;i++){
       if(hits[i]>0){
       MatC.nnz ++;
       MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
@@ -80,8 +82,8 @@ main(int argc, char *argv[]){
       if (MatC.coo_c == NULL || MatC.coo_r==NULL)
         {fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
           exit(EXIT_FAILURE);}
-      MatC.coo_r[MatC.nnz-1] = i;
-      MatC.coo_c[MatC.nnz-1] = j;
+      MatC.coo_c[MatC.nnz-1] = j+j%block;
+      MatC.coo_r[MatC.nnz-1] = i-(j%block)*MatC.rows;
       }
     }
     free(hits);
