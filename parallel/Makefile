@@ -11,6 +11,13 @@ main_simple3: mmio.o main_simple3.o
 main_simple3.o: main_simple3.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_simple3.c -fopenmp
 
+# MPI Implementation
+main_mpi: mmio.o main_mpi.o
+	$(MPICC) $(CFLAGS) -o $@ mmio.o main_mpi.o
+
+main_mpi: main_mpi.c inc/mmio.h
+	$(MPICC) $(CFLAGS) -c main_mpi.c
+
 #---------------------------------------------
 # Compiling libraries
 mmio.o: inc/mmio.c
@@ -20,3 +27,4 @@ mmio.o: inc/mmio.c
 
 clean:
 	rm -f main_simple3 main_simple3.o mmio.o
+	rm -f main_mpi main_mpi.o mmio.o
