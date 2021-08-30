@@ -136,8 +136,8 @@ main(int argc, char *argv[]){
 
 
   /* Free arrays allocated for omp */
-  for (int i=0;i<MatC.rows;i++) free(finalHits[i]);
-  free(finalHits);
+  for (int i=0;i<MatC.rows;i++) free(totalHits[i]);
+  free(totalHits);
   /* Free csc arrays allocated from readFile(...)  */
   free(MatA.csc_r);
   free(MatA.csc_c);
