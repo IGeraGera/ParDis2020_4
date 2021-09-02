@@ -295,8 +295,10 @@ main(int argc, char *argv[]){
 					/* Multiply the arrays A x B = Ctemp */
 					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],&tempC);
 					// DEBUG
+					/* if (rank ==0){ */
 					/* for (int i=0;i<tempC.nnz;i++){ */
 					/* 	if(rank==0) printf("Arri %d Arrj %d i %d j %d\n",Crow,Ccol,tempC.coo_r[i]+MatrixArrA[Cptr].i+1,tempC.coo_c[i]+MatrixArrA[Cptr].j+1); */
+					/* } */
 					/* } */
 					/* Merge the results of temporary matrix to MatrixCOOArrC*/
 					/* Check if tempSubC is empty and the tempC loaded and pass the results to it */
@@ -306,72 +308,97 @@ main(int argc, char *argv[]){
 						tempSubC.nnz   = tempC.nnz;
 						/* Sort the Matrix */
 						sortMat(tempSubC);
+
 					} 
 					/* Check if both MatrixCOOArrC and tempC are empty and continue */
 					else if ( tempC.nnz == 0 ) continue;
 					/* If tempC and tempSubC are loaded merge the 2 of them */
 					else {
-						int searchIndex=0;
-						int endIndex = tempSubC.nnz;
-						int currIndex = 0;
-						int forceAdd =0;
-						int i=0; // tempC index
-						int hit =-1;
 						/* Sort the tempC matrix by columns */
 						sortMat(tempC);
-						/* Iterate the matrix elements 
-						It's assumed that both matrixes are sorted by columns*/
-						while(i<tempC.nnz){
-							/* If the column in the tempC matrix is smaller that tempSubC then pop it in */
-							/* If the force flag is set or no hit was found pop it in */
-							if ( (tempC.coo_c[i]<tempSubC.coo_c[searchIndex]) || forceAdd == 1 || hit == 0){
-								/* Put the element in the tempSubC */
+					        int *rows =NULL;
+						int *cols = NULL;
+						int nnz = 0;	
+						int tempCin=0;
+						int tempSubCin=0;
 
-								tempSubC.nnz++;
-								tempSubC.coo_r = (int *)realloc(tempSubC.coo_r,tempSubC.nnz*sizeof(int));
-								tempSubC.coo_c = (int *)realloc(tempSubC.coo_c,tempSubC.nnz*sizeof(int));
-								tempSubC.coo_r[tempSubC.nnz-1] = tempC.coo_r[i];
-                                                                tempSubC.coo_c[tempSubC.nnz-1] = tempC.coo_c[i];
-
-								i++;
-								continue;
+						/* The matrix is sorted by columns and rows */
+						while(1){
+							/* Check if any mat finished and copy the remaining elements */
+							if (tempCin==tempC.nnz){
+								int start = nnz;
+								nnz+=tempSubC.nnz-tempSubCin;
+								rows = realloc(rows,nnz*sizeof(int));
+								cols = realloc(cols,nnz*sizeof(int));
+								for (int i =0;i<tempSubC.nnz-tempSubCin;i++){
+									rows[start+i] = tempSubC.coo_r[tempSubCin+i];
+									cols[start+i] = tempSubC.coo_c[tempSubCin+i];
+								}
+								break;
 							}
-							/* If the tempC column is larger than tempSubC then move the search index to match the currindex */
-							else if (tempC.coo_c[i]>tempSubC.coo_c[searchIndex]){
-								while(1){
- 									/* If the search index is larger that the end the remaining elements are larger */
-									/* Set the forceAdd flag */
-									if (searchIndex == endIndex){
-										forceAdd =1;
-										break;
-									}
-									searchIndex++;
-									if (tempC.coo_c[i]==tempSubC.coo_c[searchIndex]){
-										break;
-									}
+							if (tempSubCin==tempSubC.nnz){
+								int start = nnz;
+								nnz+=tempC.nnz-tempCin;
+								rows = realloc(rows,nnz*sizeof(int));
+								cols = realloc(cols,nnz*sizeof(int));
+								for (int i =0;i<tempC.nnz-tempCin;i++){
+									rows[start+i] = tempC.coo_r[tempCin+i];
+									cols[start+i] = tempC.coo_c[tempCin+i];
+								}
+								break;
+							}
+							if (tempC.coo_c[tempCin]<tempSubC.coo_c[tempSubCin]){
+								nnz++;
+								rows = realloc(rows,nnz*sizeof(int));
+								cols = realloc(cols,nnz*sizeof(int));
+								rows[nnz-1] = tempC.coo_r[tempCin];
+								cols[nnz-1] = tempC.coo_c[tempCin];
+								tempCin++;
+							}
+							else if (tempC.coo_c[tempCin]>tempSubC.coo_c[tempSubCin]){
+								nnz++;
+								rows = realloc(rows,nnz*sizeof(int));
+								cols = realloc(cols,nnz*sizeof(int));
+								rows[nnz-1] = tempSubC.coo_r[tempSubCin];
+								cols[nnz-1] = tempSubC.coo_c[tempSubCin];
+								tempSubCin++;
+							}
+							else if (tempC.coo_c[tempCin]==tempSubC.coo_c[tempSubCin]){
+								/* Check the row  */
+								if (tempC.coo_r[tempCin]<tempSubC.coo_r[tempSubCin]){
+									nnz++;
+									rows = realloc(rows,nnz*sizeof(int));
+									cols = realloc(cols,nnz*sizeof(int));
+									rows[nnz-1] = tempC.coo_r[tempCin];
+									cols[nnz-1] = tempC.coo_c[tempCin];
+									tempCin++;
+								}
+								else if (tempC.coo_r[tempCin]==tempSubC.coo_r[tempSubCin]){
+									nnz++;
+									rows = realloc(rows,nnz*sizeof(int));
+									cols = realloc(cols,nnz*sizeof(int));
+									rows[nnz-1] = tempSubC.coo_r[tempSubCin];
+									cols[nnz-1] = tempSubC.coo_c[tempSubCin];
+									tempSubCin++;
+									tempCin++;}
+								else{
+									nnz++;
+									rows = realloc(rows,nnz*sizeof(int));
+									cols = realloc(cols,nnz*sizeof(int));
+									rows[nnz-1] = tempSubC.coo_r[tempSubCin];
+									cols[nnz-1] = tempSubC.coo_c[tempSubCin];
+									tempSubCin++;
 								}
 							}
-							if (tempC.coo_c[i]==tempSubC.coo_c[searchIndex] && forceAdd == 0){
-								hit = 0;
-								currIndex = searchIndex;
-								while(tempC.coo_c[i]==tempSubC.coo_c[currIndex]){
-									if (tempC.coo_r[i]==tempSubC.coo_r[currIndex]){
-										hit=1;
-										i++;
-										break;
-									}
-									else{
-										currIndex++;
-										if  (currIndex==endIndex || tempC.coo_c[i]!=tempSubC.coo_c[currIndex] ) break;
-									}
-								}
-							}
-						}
-						/* Sort the output Matrix */
-						sortMat(tempSubC);
+						} 
 						/* Free tempC coo matrices */
 						free(tempC.coo_r);
 						free(tempC.coo_c);
+						free(tempSubC.coo_r);
+						free(tempSubC.coo_c);
+						tempSubC.coo_r =rows;
+						tempSubC.coo_c =cols;
+						tempSubC.nnz=nnz;
 					}
 				} 
 			}
@@ -392,9 +419,10 @@ main(int argc, char *argv[]){
 		}
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-        if(rank==1){
-	  puts("\nMATRIX C\n");
-	  for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1);
+	sortMat(MatrixCOOArrC);
+	if(rank==2){
+		puts("\nMATRIX C\n");
+		for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1);
 	}
 	/* MPI Gather the array */
 	/* MPI END */ 
@@ -403,9 +431,9 @@ main(int argc, char *argv[]){
 	double ts_sec,ts_nsec;
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
-	/* printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000); */
+	printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
-	MatC = sortMat(MatC);
+	//MatC = sortMat(MatC);
 
 	/* DEBUGGING PRINTOUTS */
 	/* 
@@ -490,6 +518,38 @@ sortMat(cooMat Matrix){
 				}
 			}
 		}
+	}
+	int end,start,offset;
+	end =0;
+	while(1){
+		start = end;
+		offset=1;
+		while(1){
+			if (Matrix.coo_c[start]!=Matrix.coo_c[start+offset] || start+offset == Matrix.nnz ){
+				end=start+offset;
+				break;
+			}
+			else offset++;
+		}
+		/*Check Element if is smaller than the previous */
+		for (int i =start+1 ;i<end;i++){
+			/* If it's smaller rollback by checking each element and swap with the i element until sorted in place */
+			if (Matrix.coo_r[i]<Matrix.coo_r[i-1]){
+				for (int j =i-1;j>=start;j--){
+					if (Matrix.coo_r[j]>Matrix.coo_r[j+1]){
+						int temp;
+						temp = Matrix.coo_c[j+1];
+						Matrix.coo_c[j+1] = Matrix.coo_c[j];
+						Matrix.coo_c[j] = temp;
+						temp = Matrix.coo_r[j+1];
+						Matrix.coo_r[j+1] = Matrix.coo_r[j];
+						Matrix.coo_r[j] = temp;
+					}
+				}
+			}
+		}
+		/* Check if the end is the end of the array */
+		if(end==Matrix.nnz) break;
 	}
 	return Matrix;
 }
