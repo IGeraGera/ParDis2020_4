@@ -437,7 +437,7 @@ main(int argc, char *argv[]){
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
 	printf("Rank %d Time till calc %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
-	sortMat(MatrixCOOArrC);
+	//sortMat(MatrixCOOArrC);
 	clock_gettime(CLOCK_MONOTONIC,&ts_end);
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
