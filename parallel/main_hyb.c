@@ -264,7 +264,6 @@ main(int argc, char *argv[]){
 	   }
 	   exit(EXIT_SUCCESS) ;
 	   */
-	MPI_Barrier(MPI_COMM_WORLD);
 	MatrixCOOArrC.nnz=0;
 	MatrixCOOArrC.coo_c=NULL;
 	MatrixCOOArrC.coo_r=NULL;
@@ -427,8 +426,7 @@ main(int argc, char *argv[]){
 	/* 	printf("nnz %d\n",MatrixCOOArrC.nnz); */
 	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
 	/*  }  */
-	MPI_Barrier(MPI_COMM_WORLD);
-	sortMat(MatrixCOOArrC);
+	/* sortMat(MatrixCOOArrC); */
 	/* Get the displacement to fit the arrays */
 	int recvcount[numtasks], displs[numtasks];
 	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
