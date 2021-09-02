@@ -57,15 +57,6 @@ main(int argc, char *argv[]){
 	struct timespec ts_end;
 	clock_gettime(CLOCK_MONOTONIC,&ts_start);
 
-	/* Block size for each axis */
-	int block = 4;
-	/* Check the size of the block if is greater that rows */
-	if(MatC.rows/block<2){
-		printf("Block too large Block Size %d Rows %d\n Exiting\n",block,MatC.rows);
-		exit(EXIT_FAILURE);
-	}
-	int blockalloc=block; // if the rows%block is larger put an extra bucket
-	if (MatC.rows%block!=0 ) blockalloc++;
 
 	/* MPI */
 	int numtasks,rank;
@@ -76,6 +67,16 @@ main(int argc, char *argv[]){
 	MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	//printf("tasks %d rank %d\n",numtasks,rank);
+
+	/* Block size for each axis */
+	int block = numtasks;
+	/* Check the size of the block if is greater that rows */
+	if(MatC.rows/block<2){
+		printf("Block too large Block Size %d Rows %d\n Exiting\n",block,MatC.rows);
+		exit(EXIT_FAILURE);
+	}
+	int blockalloc=block; // if the rows%block is larger put an extra bucket
+	if (MatC.rows%block!=0 ) blockalloc++;
 
 	/* Assign the workload to every thread */
 	/* Every process gets a block of columns to calculate from the matrix C */
