@@ -58,7 +58,7 @@ main(int argc, char *argv[]){
 	clock_gettime(CLOCK_MONOTONIC,&ts_start);
 
 	/* Block size for each axis */
-	int block = 3;
+	int block = 4;
 	/* Check the size of the block if is greater that rows */
 	if(MatC.rows/block<2){
 		printf("Block too large Block Size %d Rows %d\n Exiting\n",block,MatC.rows);
@@ -420,11 +420,25 @@ main(int argc, char *argv[]){
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	sortMat(MatrixCOOArrC);
-	if(rank==2){
-		puts("\nMATRIX C\n");
-		for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1);
-	}
+	/* if(rank==2){ */
+	/* 	puts("\nMATRIX C\n"); */
+	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
+	/* } */ 
+	/* Get the displacement to fit the arrays */
+	int recvcount[numtasks], displs[numtasks];
+	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
 	/* MPI Gather the array */
+	if(rank==0){
+		displs[0]=0;
+		for (int i=0;i<numtasks;i++)	MatC.nnz += recvcount[i];
+		for (int i=0;i<numtasks-1;i++) 	displs[i+1]=displs[i]+recvcount[i];	
+		MatC.coo_r = (int *) malloc(MatC.nnz*sizeof(int));
+		MatC.coo_c = (int *) malloc(MatC.nnz*sizeof(int));
+	}
+	MPI_Gatherv(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz,MPI_INT,
+		    MatC.coo_r,recvcount,displs,MPI_INT,0,MPI_COMM_WORLD);
+	MPI_Gatherv(MatrixCOOArrC.coo_c,MatrixCOOArrC.nnz,MPI_INT,
+		    MatC.coo_c,recvcount,displs,MPI_INT,0,MPI_COMM_WORLD);
 	/* MPI END */ 
 	MPI_Finalize();
 	clock_gettime(CLOCK_MONOTONIC,&ts_end);
@@ -433,7 +447,10 @@ main(int argc, char *argv[]){
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
 	printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
-	//MatC = sortMat(MatC);
+	/* if(rank==0){ */
+	/* 	MatC = sortMat(MatC); */
+	/* 	for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1); */
+	/* } */
 
 	/* DEBUGGING PRINTOUTS */
 	/* 
@@ -453,7 +470,15 @@ main(int argc, char *argv[]){
 	  /* for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]); */
 
 
-
+	/* Deallocate Matrices */
+	for(int i=0;i<blockalloc*blockalloc;i++){
+		free(MatrixArrA[i].csc_r);
+		free(MatrixArrA[i].csc_c);
+	}
+	free(MatrixArrA);
+	free(MatrixArrB);
+	free(MatrixCOOArrC.coo_c);
+	free(MatrixCOOArrC.coo_r);
 	/* Free csc arrays allocated from readFile(...)  */
 	free(MatA.csc_r);
 	free(MatA.csc_c);
