@@ -55,6 +55,7 @@ main(int argc, char *argv[]){
 	/* Timing variables< */
 	struct timespec ts_start;
 	struct timespec ts_end;
+	double ts_sec,ts_nsec;
 	clock_gettime(CLOCK_MONOTONIC,&ts_start);
 
 
@@ -101,6 +102,12 @@ main(int argc, char *argv[]){
 			workEnd  =workStart +workload;
 		}
 	}
+	printf("rank %d start %d end %d\n",rank,workStart,workEnd);
+
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("rank %d Time till workload %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 
 	/* Allocate an arrays that will contain the  blocks COO and CSC  */
 	MatrixCOOArrA = malloc(blockalloc*blockalloc*sizeof(struct cooMatrix));
@@ -169,6 +176,10 @@ main(int argc, char *argv[]){
 			MatrixCOOArrB[ptr].coo_c[MatrixCOOArrB[ptr].nnz-1] = j - Arrj*MatrixCOOArrB[ptr].rows;
 		}
 	}
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time to disect %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Covert All COO to CSC */
 	//TODO: Remember to free
 	MatrixArrA =  malloc(blockalloc*blockalloc*sizeof(struct cscMatrix));
@@ -263,7 +274,10 @@ main(int argc, char *argv[]){
 	   }
 	   exit(EXIT_SUCCESS) ;
 	   */
-	MPI_Barrier(MPI_COMM_WORLD);
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time till COO to CSC %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	MatrixCOOArrC.nnz=0;
 	MatrixCOOArrC.coo_c=NULL;
 	MatrixCOOArrC.coo_r=NULL;
@@ -419,8 +433,15 @@ main(int argc, char *argv[]){
 			free(tempSubC.coo_c);
 		}
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time till calc %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	sortMat(MatrixCOOArrC);
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time till COO sort %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* if(rank==2){ */
 	/* 	puts("\nMATRIX C\n"); */
 	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
@@ -443,10 +464,9 @@ main(int argc, char *argv[]){
 	/* MPI END */ 
 	MPI_Finalize();
 	clock_gettime(CLOCK_MONOTONIC,&ts_end);
-	double ts_sec,ts_nsec;
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
-	printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
+	printf("Rank %d Execution Time %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
 	/* if(rank==0){ */
 	/* 	MatC = sortMat(MatC); */
