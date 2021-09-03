@@ -18,6 +18,14 @@ main_mpi: mmio.o main_mpi.o
 main_mpi.o: main_mpi.c inc/mmio.h
 	$(MPICC) $(CFLAGS) -c main_mpi.c
 
+# MPI Implementation Version2
+main_mpi2: mmio.o main_mpi2.o
+	$(MPICC) $(CFLAGS) -o $@ mmio.o main_mpi2.o
+
+main_mpi2.o: main_mpi2.c inc/mmio.h
+	$(MPICC) $(CFLAGS) -c main_mpi2.c
+
+
 # MPI + OMP Hybrid Implementation
 main_hyb: mmio.o main_hyb.o
 	$(MPICC) $(CFLAGS) -o $@ mmio.o main_hyb.o -fopenmp
@@ -34,4 +42,5 @@ mmio.o: inc/mmio.c
 clean:
 	rm -f main_simple3 main_simple3.o mmio.o
 	rm -f main_mpi main_mpi.o mmio.o
+	rm -f main_mpi2 main_mpi2.o mmio.o
 	rm -f main_hyb main_hyb.o mmio.o
