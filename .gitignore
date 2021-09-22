@@ -1,10 +1,12 @@
 # DIRECTORIES
-data
+*data
 naive/russians
 naive/main
 # FILES
 *main_mpi
 *main_simple3
+*main_hyb
+*main_omp
 .*.swp
 *.md
 *.swp
