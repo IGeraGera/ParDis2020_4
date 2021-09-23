@@ -136,7 +136,7 @@ main(int argc, char *argv[]){
   ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
   printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
   /* Sort MatC by column for tests  */
-  MatC = sortMat(MatC);
+  /* MatC = sortMat(MatC); */
 
   /* DEBUGGING PRINTOUTS */
  /* 
@@ -152,8 +152,8 @@ main(int argc, char *argv[]){
  
  */
 
-  puts("\nMATRIX C\n");
-  for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]);
+  /* puts("\nMATRIX C\n"); */
+  /* for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]); */
 
 
 
