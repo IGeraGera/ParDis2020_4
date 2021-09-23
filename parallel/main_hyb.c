@@ -34,7 +34,7 @@ void coo2csc(int * const row,int * const col,int const * const row_coo,
 		int const * const col_coo,int const nnz,int const n,int const isOneBased);
 cscMat readFile(char *filename);
 cooMat sortMat(cooMat Matrix);
-void matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC);
+void matrixMult(cscMat MatA, cscMat MatB, int **totalHits, int *totalHitsSize, int firstFlag);
 
 /* <<< --- MAIN --- >>> */
 int
@@ -281,21 +281,20 @@ main(int argc, char *argv[]){
 			tempSubC.nnz = 0;
 			tempSubC.i = Crow * MatrixArrA[Cptr].rows;
 			tempSubC.j = Ccol * MatrixArrA[Cptr].rows;
+			/* Allocate an array that contains the hits for each column */
+			int **totalHits = (int **) malloc(MatrixArrA[Cptr].rows*sizeof(int*));
+			int *totalHitsSize = (int *) malloc(MatrixArrA[Cptr].rows*sizeof(int));
+			int firstFlag = 1;
 			/* if (rank==0) printf("Arri %d Arrj %d rows %d\n",Crow,Ccol,MatrixArrA[Cptr].rows); */
 			/* Iterate the blocks in respect to row and column */
 			for(int Ck=0;Ck<blockalloc;Ck++){
 				int Aptr = Crow+blockalloc*Ck;
 				int Bptr = Ck+blockalloc*Ccol;
-				/* Temporary Matrix with result */
-				cooMat tempC;
-				tempC.coo_r = NULL;
-				tempC.coo_c = NULL;
-				tempC.nnz = 0;
-				tempC.rows = MatrixArrA[Cptr].rows;
 				// If block is empty skip
 				if (MatrixArrA[Aptr].nnz>0 && MatrixArrB[Bptr].nnz>0){
 					/* Multiply the arrays A x B = Ctemp */
-					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],&tempC);
+					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],totalHits,totalHitsSize,firstFlag);
+					firstFlag=0;
 					// DEBUG
 					/* if (rank ==0){ */
 					/* 	printf("nnz %d\n",tempC.nnz); */
@@ -304,107 +303,27 @@ main(int argc, char *argv[]){
 					/* } */
 					/* } */
 					/* Merge the results of temporary matrix to MatrixCOOArrC*/
-					/* Check if tempSubC is empty and the tempC loaded and pass the results to it */
-					if (tempSubC.nnz == 0 && tempC.nnz!=0){
-						tempSubC.coo_r = tempC.coo_r;
-						tempSubC.coo_c = tempC.coo_c;
-						tempSubC.nnz   = tempC.nnz;
-						/* Sort the Matrix */
-						sortMat(tempSubC);
-
-					} 
-					/* Check if both MatrixCOOArrC and tempC are empty and continue */
-					else if ( tempC.nnz == 0 ) continue;
-					/* If tempC and tempSubC are loaded merge the 2 of them */
-					else {
-						/* Sort the tempC matrix by columns */
-						sortMat(tempC);
-					        int *rows =NULL;
-						int *cols = NULL;
-						int nnz = 0;	
-						int tempCin=0;
-						int tempSubCin=0;
-
-						/* The matrix is sorted by columns and rows */
-						while(1){
-							/* Check if any mat finished and copy the remaining elements */
-							if (tempCin==tempC.nnz){
-								int start = nnz;
-								nnz+=tempSubC.nnz-tempSubCin;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
-								for (int i =0;i<tempSubC.nnz-tempSubCin;i++){
-									rows[start+i] = tempSubC.coo_r[tempSubCin+i];
-									cols[start+i] = tempSubC.coo_c[tempSubCin+i];
-								}
-								break;
-							}
-							if (tempSubCin==tempSubC.nnz){
-								int start = nnz;
-								nnz+=tempC.nnz-tempCin;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
-								for (int i =0;i<tempC.nnz-tempCin;i++){
-									rows[start+i] = tempC.coo_r[tempCin+i];
-									cols[start+i] = tempC.coo_c[tempCin+i];
-								}
-								break;
-							}
-							if (tempC.coo_c[tempCin]<tempSubC.coo_c[tempSubCin]){
-								nnz++;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
-								rows[nnz-1] = tempC.coo_r[tempCin];
-								cols[nnz-1] = tempC.coo_c[tempCin];
-								tempCin++;
-							}
-							else if (tempC.coo_c[tempCin]>tempSubC.coo_c[tempSubCin]){
-								nnz++;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
-								rows[nnz-1] = tempSubC.coo_r[tempSubCin];
-								cols[nnz-1] = tempSubC.coo_c[tempSubCin];
-								tempSubCin++;
-							}
-							else if (tempC.coo_c[tempCin]==tempSubC.coo_c[tempSubCin]){
-								/* Check the row  */
-								if (tempC.coo_r[tempCin]<tempSubC.coo_r[tempSubCin]){
-									nnz++;
-									rows = realloc(rows,nnz*sizeof(int));
-									cols = realloc(cols,nnz*sizeof(int));
-									rows[nnz-1] = tempC.coo_r[tempCin];
-									cols[nnz-1] = tempC.coo_c[tempCin];
-									tempCin++;
-								}
-								else if (tempC.coo_r[tempCin]==tempSubC.coo_r[tempSubCin]){
-									nnz++;
-									rows = realloc(rows,nnz*sizeof(int));
-									cols = realloc(cols,nnz*sizeof(int));
-									rows[nnz-1] = tempSubC.coo_r[tempSubCin];
-									cols[nnz-1] = tempSubC.coo_c[tempSubCin];
-									tempSubCin++;
-									tempCin++;}
-								else{
-									nnz++;
-									rows = realloc(rows,nnz*sizeof(int));
-									cols = realloc(cols,nnz*sizeof(int));
-									rows[nnz-1] = tempSubC.coo_r[tempSubCin];
-									cols[nnz-1] = tempSubC.coo_c[tempSubCin];
-									tempSubCin++;
-								}
-							}
-						} 
-						/* Free tempC coo matrices */
-						free(tempC.coo_r);
-						free(tempC.coo_c);
-						free(tempSubC.coo_r);
-						free(tempSubC.coo_c);
-						tempSubC.coo_r =rows;
-						tempSubC.coo_c =cols;
-						tempSubC.nnz=nnz;
-					}
 				} 
 			}
+			/* The Last time create the MatrixCOOArrC */
+			/* Allocate memory */
+			for(int j=0;j<MatrixArrA[Cptr].rows;j++){
+				int nnz= 0;
+				for (int nnz=0;nnz<totalHitsSize[j];nnz++){
+					tempSubC.nnz ++;
+					tempSubC.coo_r = (int *)realloc(tempSubC.coo_r,tempSubC.nnz*sizeof(int));
+					tempSubC.coo_c = (int *)realloc(tempSubC.coo_c,tempSubC.nnz*sizeof(int));
+					if (tempSubC.coo_c == NULL || tempSubC.coo_r==NULL)
+					{fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
+						exit(EXIT_FAILURE);}
+					tempSubC.coo_c[tempSubC.nnz-1] = j;
+					tempSubC.coo_r[tempSubC.nnz-1] = totalHits[j][nnz];
+				}
+				free(totalHits[j]);
+			}
+			/* Free arrays allocated for omp */
+			free(totalHits);
+			free(totalHitsSize);
 			/* Realloc space for the new elements */
 			int startIndex = MatrixCOOArrC.nnz;
 			MatrixCOOArrC.nnz+=tempSubC.nnz;
@@ -493,15 +412,17 @@ main(int argc, char *argv[]){
 
 /* This routine Multiplies 2 csc matrixes */
 void 
-matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC){
+matrixMult(cscMat MatA, cscMat MatB, int **totalHits, int *totalHitsSize, int firstFlag){
 	/* This currently works for matrices RowsxRows */
-	int ** totalHits = (int **)malloc(MatA.rows  * sizeof(int *));
 #pragma omp parallel for 
 	for(int j=0;j<MatA.rows;j++){
+		/* Check if is the first pass and the totalHit is empty */
+		if(firstFlag==1){
+			/* set finalHits to NULL */
+			totalHits[j]=NULL;
+			totalHitsSize[j]=0;
+		}
 		/* Iterate B column */
-
-		int * finalHits = NULL;
-		int nnz=0;
 		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
 			int MatArow=MatB.csc_r[c];
 			for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
@@ -509,50 +430,21 @@ matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC){
 				/* Set a flag that tracks if a same value (hit) is the answers */
 				int hitflag=0;
 				/* Check in current hits if this one exists */
-				for(int hit=0;hit<nnz;hit++){
-					if(i==finalHits[hit]) {
+				for(int hit=0;hit<totalHitsSize[j];hit++){
+					if(i==totalHits[j][hit]) {
 						/* set the flag and break */
 						hitflag=1;
 						break;
 					}
 				}
 				if(hitflag==0){
-					nnz++;
-					finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
-					finalHits[nnz-1] = i;
+					totalHitsSize[j]++;
+					totalHits[j] = (int *)realloc(totalHits[j],totalHitsSize[j]*sizeof(int));
+					totalHits[j][totalHitsSize[j]-1] = i;
 				}
 			}
 		}
-		nnz++;
-		finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
-		finalHits[nnz-1] = -1;
-
-		totalHits[j]=finalHits;
-		//clock_gettime(CLOCK_MONOTONIC,&end);
-		//double sec,nsec;
-		//sec = end.tv_sec - start.tv_sec;
-		//nsec = end.tv_nsec - start.tv_nsec;
-		//printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
 	}
-	/* Allocate memory */
-	//TODO: free finalHits and total hits
-	for(int j=0;j<MatC->rows;j++){
-		int nnz= 0;
-		while(totalHits[j][nnz]!=-1) {
-			MatC->nnz ++;
-			MatC->coo_r = (int *)realloc(MatC->coo_r,MatC->nnz*sizeof(int));
-			MatC->coo_c = (int *)realloc(MatC->coo_c,MatC->nnz*sizeof(int));
-			if (MatC->coo_c == NULL || MatC->coo_r==NULL)
-			{fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
-				exit(EXIT_FAILURE);}
-			MatC->coo_c[MatC->nnz-1] = j;
-			MatC->coo_r[MatC->nnz-1] = totalHits[j][nnz];
-			nnz++;
-		}
-	}
-	/* Free arrays allocated for omp */
-	for (int i=0;i<MatC->rows;i++) free(totalHits[i]);
-	free(totalHits);
 }
 /* This function sorts a COO Matrix sorted by row to COO Matrix sorted by column */
 /* Insertion Sort */

@@ -7,6 +7,8 @@ naive/main
 *main_simple3
 *main_hyb
 *main_omp
+*main_omp2
+*main_naive
 .*.swp
 *.md
 *.swp
