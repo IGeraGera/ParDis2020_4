@@ -11,6 +11,11 @@ main_omp: mmio.o main_omp.o
 main_omp.o: main_omp.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_omp.c -fopenmp
 
+main_omp2: mmio.o main_omp2.o 
+	$(CC) $(CFLAGS) -o $@ mmio.o main_omp2.o -fopenmp
+
+main_omp2.o: main_omp2.c inc/mmio.h
+	$(CC) $(CFLAGS) -c main_omp2.c -fopenmp
 # MPI Implementation
 main_mpi: mmio.o main_mpi.o
 	$(MPICC) $(CFLAGS) -o $@ mmio.o main_mpi.o
@@ -41,6 +46,7 @@ mmio.o: inc/mmio.c
 
 clean:
 	rm -f main_omp main_omp.o mmio.o
+	rm -f main_omp2 main_omp2.o mmio.o
 	rm -f main_mpi main_mpi.o mmio.o
 	rm -f main_mpi2 main_mpi2.o mmio.o
 	rm -f main_hyb main_hyb.o mmio.o
