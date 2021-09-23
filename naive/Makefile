@@ -42,6 +42,12 @@ main_4R_LUT: mmio.o main_4R_LUT.o
 main_4R_LUT.o: main_4R_LUT.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_4R_LUT.c 
 
+main_naive: mmio.o main_naive.o
+	$(CC) $(CFLAGS) -o $@ mmio.o main_naive.o
+
+main_naive.o: main_naive.c inc/mmio.h
+	$(CC) $(CFLAGS) -c main_naive.c
+
 mmio.o: inc/mmio.c
 	$(CC) $(CFLAGS) -c inc/mmio.c
 
@@ -61,6 +67,8 @@ clean:
 	-rm -f main
 	-rm -f main_simple.o
 	-rm -f main_simple
+	-rm -f main_naive.o
+	-rm -f main_naive
 	-rm -f main_4R_LUT.o
 	-rm -f main_4R_LUT
 	-rm -f main_simple2.o

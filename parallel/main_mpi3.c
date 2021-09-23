@@ -9,7 +9,6 @@
 #include<math.h>
 #include"inc/mmio.h"
 #include"mpi.h"
-#include"omp.h"
 extern int errno ;
 /* Structs Declaration */
 typedef struct cscMatrix{
@@ -27,6 +26,7 @@ typedef struct cooMatrix{
 	int rows;
 	int i;
 	int j;
+	int size;
 }cooMat;
 /* Function Predeclarations */
 void checkArgsNum(int argc);
@@ -35,6 +35,7 @@ void coo2csc(int * const row,int * const col,int const * const row_coo,
 cscMat readFile(char *filename);
 cooMat sortMat(cooMat Matrix);
 void matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC);
+void checkCOOMat(cooMat *Mat,int idx);
 
 /* <<< --- MAIN --- >>> */
 int
@@ -56,6 +57,7 @@ main(int argc, char *argv[]){
 	/* Timing variables< */
 	struct timespec ts_start;
 	struct timespec ts_end;
+	double ts_sec,ts_nsec;
 	clock_gettime(CLOCK_MONOTONIC,&ts_start);
 
 
@@ -102,6 +104,12 @@ main(int argc, char *argv[]){
 			workEnd  =workStart +workload;
 		}
 	}
+	printf("rank %d start %d end %d\n",rank,workStart,workEnd);
+
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("rank %d Time till workload %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 
 	/* Allocate an arrays that will contain the  blocks COO and CSC  */
 	MatrixCOOArrA = malloc(blockalloc*blockalloc*sizeof(struct cooMatrix));
@@ -170,6 +178,10 @@ main(int argc, char *argv[]){
 			MatrixCOOArrB[ptr].coo_c[MatrixCOOArrB[ptr].nnz-1] = j - Arrj*MatrixCOOArrB[ptr].rows;
 		}
 	}
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time to disect %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Covert All COO to CSC */
 	//TODO: Remember to free
 	MatrixArrA =  malloc(blockalloc*blockalloc*sizeof(struct cscMatrix));
@@ -264,6 +276,10 @@ main(int argc, char *argv[]){
 	   }
 	   exit(EXIT_SUCCESS) ;
 	   */
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time till COO to CSC %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	MatrixCOOArrC.nnz=0;
 	MatrixCOOArrC.coo_c=NULL;
 	MatrixCOOArrC.coo_r=NULL;
@@ -288,17 +304,16 @@ main(int argc, char *argv[]){
 				int Bptr = Ck+blockalloc*Ccol;
 				/* Temporary Matrix with result */
 				cooMat tempC;
-				tempC.coo_r = NULL;
-				tempC.coo_c = NULL;
+				tempC.size=1000;
+				tempC.coo_r = (int *)malloc(tempC.size*sizeof(int));
+				tempC.coo_c = (int *)malloc(tempC.size*sizeof(int));
 				tempC.nnz = 0;
-				tempC.rows = MatrixArrA[Cptr].rows;
 				// If block is empty skip
 				if (MatrixArrA[Aptr].nnz>0 && MatrixArrB[Bptr].nnz>0){
 					/* Multiply the arrays A x B = Ctemp */
 					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],&tempC);
 					// DEBUG
 					/* if (rank ==0){ */
-					/* 	printf("nnz %d\n",tempC.nnz); */
 					/* for (int i=0;i<tempC.nnz;i++){ */
 					/* 	if(rank==0) printf("Arri %d Arrj %d i %d j %d\n",Crow,Ccol,tempC.coo_r[i]+MatrixArrA[Cptr].i+1,tempC.coo_c[i]+MatrixArrA[Cptr].j+1); */
 					/* } */
@@ -309,6 +324,7 @@ main(int argc, char *argv[]){
 						tempSubC.coo_r = tempC.coo_r;
 						tempSubC.coo_c = tempC.coo_c;
 						tempSubC.nnz   = tempC.nnz;
+						tempSubC.size  = tempC.size;
 						/* Sort the Matrix */
 						sortMat(tempSubC);
 
@@ -319,9 +335,11 @@ main(int argc, char *argv[]){
 					else {
 						/* Sort the tempC matrix by columns */
 						sortMat(tempC);
-					        int *rows =NULL;
-						int *cols = NULL;
-						int nnz = 0;	
+						cooMat newtempC;
+						newtempC.size=1000;
+						newtempC.coo_r = (int *)malloc(newtempC.size*sizeof(int));
+					        newtempC.coo_c = (int *)malloc(newtempC.size*sizeof(int));
+						newtempC.nnz=0;
 						int tempCin=0;
 						int tempSubCin=0;
 
@@ -329,67 +347,60 @@ main(int argc, char *argv[]){
 						while(1){
 							/* Check if any mat finished and copy the remaining elements */
 							if (tempCin==tempC.nnz){
-								int start = nnz;
-								nnz+=tempSubC.nnz-tempSubCin;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
+								int start = newtempC.nnz;
+								newtempC.nnz+=tempSubC.nnz-tempSubCin;
+								checkCOOMat(&newtempC,newtempC.nnz-1);
 								for (int i =0;i<tempSubC.nnz-tempSubCin;i++){
-									rows[start+i] = tempSubC.coo_r[tempSubCin+i];
-									cols[start+i] = tempSubC.coo_c[tempSubCin+i];
+									newtempC.coo_r[start+i] = tempSubC.coo_r[tempSubCin+i];
+									newtempC.coo_c[start+i] = tempSubC.coo_c[tempSubCin+i];
 								}
 								break;
 							}
 							if (tempSubCin==tempSubC.nnz){
-								int start = nnz;
-								nnz+=tempC.nnz-tempCin;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
+								int start = newtempC.nnz;
+								newtempC.nnz+=tempC.nnz-tempCin;
+								checkCOOMat(&newtempC,newtempC.nnz-1);
 								for (int i =0;i<tempC.nnz-tempCin;i++){
-									rows[start+i] = tempC.coo_r[tempCin+i];
-									cols[start+i] = tempC.coo_c[tempCin+i];
+									newtempC.coo_r[start+i] = tempC.coo_r[tempCin+i];
+									newtempC.coo_c[start+i] = tempC.coo_c[tempCin+i];
 								}
 								break;
 							}
 							if (tempC.coo_c[tempCin]<tempSubC.coo_c[tempSubCin]){
-								nnz++;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
-								rows[nnz-1] = tempC.coo_r[tempCin];
-								cols[nnz-1] = tempC.coo_c[tempCin];
+								newtempC.nnz++;
+								checkCOOMat(&newtempC,newtempC.nnz-1);
+								newtempC.coo_r[newtempC.nnz-1] = tempC.coo_r[tempCin];
+								newtempC.coo_c[newtempC.nnz-1] = tempC.coo_c[tempCin];
 								tempCin++;
 							}
 							else if (tempC.coo_c[tempCin]>tempSubC.coo_c[tempSubCin]){
-								nnz++;
-								rows = realloc(rows,nnz*sizeof(int));
-								cols = realloc(cols,nnz*sizeof(int));
-								rows[nnz-1] = tempSubC.coo_r[tempSubCin];
-								cols[nnz-1] = tempSubC.coo_c[tempSubCin];
+								newtempC.nnz++;
+								checkCOOMat(&newtempC,newtempC.nnz-1);
+								newtempC.coo_r[newtempC.nnz-1] = tempSubC.coo_r[tempSubCin];
+								newtempC.coo_c[newtempC.nnz-1] = tempSubC.coo_c[tempSubCin];
 								tempSubCin++;
 							}
 							else if (tempC.coo_c[tempCin]==tempSubC.coo_c[tempSubCin]){
 								/* Check the row  */
 								if (tempC.coo_r[tempCin]<tempSubC.coo_r[tempSubCin]){
-									nnz++;
-									rows = realloc(rows,nnz*sizeof(int));
-									cols = realloc(cols,nnz*sizeof(int));
-									rows[nnz-1] = tempC.coo_r[tempCin];
-									cols[nnz-1] = tempC.coo_c[tempCin];
+									newtempC.nnz++;
+									checkCOOMat(&newtempC,newtempC.nnz-1);
+									newtempC.coo_r[newtempC.nnz-1] = tempC.coo_r[tempCin];
+									newtempC.coo_c[newtempC.nnz-1] = tempC.coo_c[tempCin];
 									tempCin++;
 								}
 								else if (tempC.coo_r[tempCin]==tempSubC.coo_r[tempSubCin]){
-									nnz++;
-									rows = realloc(rows,nnz*sizeof(int));
-									cols = realloc(cols,nnz*sizeof(int));
-									rows[nnz-1] = tempSubC.coo_r[tempSubCin];
-									cols[nnz-1] = tempSubC.coo_c[tempSubCin];
+									newtempC.nnz++;
+									checkCOOMat(&newtempC,newtempC.nnz-1);
+									newtempC.coo_r[newtempC.nnz-1] = tempSubC.coo_r[tempSubCin];
+									newtempC.coo_c[newtempC.nnz-1] = tempSubC.coo_c[tempSubCin];
 									tempSubCin++;
 									tempCin++;}
 								else{
-									nnz++;
-									rows = realloc(rows,nnz*sizeof(int));
-									cols = realloc(cols,nnz*sizeof(int));
-									rows[nnz-1] = tempSubC.coo_r[tempSubCin];
-									cols[nnz-1] = tempSubC.coo_c[tempSubCin];
+									newtempC.nnz++;
+									checkCOOMat(&newtempC,newtempC.nnz-1);
+									newtempC.coo_r[newtempC.nnz-1] = tempSubC.coo_r[tempSubCin];
+									newtempC.coo_c[newtempC.nnz-1] = tempSubC.coo_c[tempSubCin];
 									tempSubCin++;
 								}
 							}
@@ -399,9 +410,10 @@ main(int argc, char *argv[]){
 						free(tempC.coo_c);
 						free(tempSubC.coo_r);
 						free(tempSubC.coo_c);
-						tempSubC.coo_r =rows;
-						tempSubC.coo_c =cols;
-						tempSubC.nnz=nnz;
+						tempSubC.coo_r =newtempC.coo_r;
+						tempSubC.coo_c =newtempC.coo_c;
+						tempSubC.nnz=newtempC.nnz;
+						tempSubC.size=newtempC.size;
 					}
 				} 
 			}
@@ -421,12 +433,19 @@ main(int argc, char *argv[]){
 			free(tempSubC.coo_c);
 		}
 	}
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time till calc %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
+	//sortMat(MatrixCOOArrC);
+	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
+	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	printf("Rank %d Time till COO sort %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* if(rank==2){ */
 	/* 	puts("\nMATRIX C\n"); */
-	/* 	printf("nnz %d\n",MatrixCOOArrC.nnz); */
 	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
-	/*  }  */
-	/* sortMat(MatrixCOOArrC); */
+	/* } */ 
 	/* Get the displacement to fit the arrays */
 	int recvcount[numtasks], displs[numtasks];
 	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
@@ -445,10 +464,9 @@ main(int argc, char *argv[]){
 	/* MPI END */ 
 	MPI_Finalize();
 	clock_gettime(CLOCK_MONOTONIC,&ts_end);
-	double ts_sec,ts_nsec;
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
-	printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
+	printf("Rank %d Execution Time %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
 	/* if(rank==0){ */
 	/* 	MatC = sortMat(MatC); */
@@ -491,20 +509,32 @@ main(int argc, char *argv[]){
 	free(MatC.coo_c);
 }
 
+void
+checkCOOMat(cooMat *Mat,int idx){
+	/* Check If the Size is larger that the index and allocate more space*/
+	if (Mat->size==(idx+1) ){
+		Mat->size*=2;
+		Mat->coo_r = (int *) realloc(Mat->coo_r,Mat->size*sizeof(int));
+		Mat->coo_c = (int *) realloc(Mat->coo_c,Mat->size*sizeof(int));
+		if (Mat->coo_c == NULL || Mat->coo_r==NULL)
+			{fprintf(stderr,"Line %d: Error reallocating coo matrix",__LINE__);
+				exit(EXIT_FAILURE);}
+
+	}
+}
+
 /* This routine Multiplies 2 csc matrixes */
 void 
 matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC){
 	/* This currently works for matrices RowsxRows */
-	int ** totalHits = (int **)malloc(MatA.rows  * sizeof(int *));
-#pragma omp parallel for 
 	for(int j=0;j<MatA.rows;j++){
-		/* Iterate B column */
-
 		int * finalHits = NULL;
 		int nnz=0;
+		/* Iterate B column */
 		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
 			int MatArow=MatB.csc_r[c];
 			for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
+				/* check if exist */
 				int i = MatA.csc_r[r];
 				/* Set a flag that tracks if a same value (hit) is the answers */
 				int hitflag=0;
@@ -516,43 +546,20 @@ matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC){
 						break;
 					}
 				}
+				/* If there is no hit then put the answer to the MatC and to the finalHits */
 				if(hitflag==0){
 					nnz++;
 					finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
 					finalHits[nnz-1] = i;
+					MatC->nnz ++;
+					checkCOOMat(MatC,MatC->nnz-1);
+					MatC->coo_r[MatC->nnz-1] = i;
+					MatC->coo_c[MatC->nnz-1] = j;
 				}
+
 			}
 		}
-		nnz++;
-		finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
-		finalHits[nnz-1] = -1;
-
-		totalHits[j]=finalHits;
-		//clock_gettime(CLOCK_MONOTONIC,&end);
-		//double sec,nsec;
-		//sec = end.tv_sec - start.tv_sec;
-		//nsec = end.tv_nsec - start.tv_nsec;
-		//printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
 	}
-	/* Allocate memory */
-	//TODO: free finalHits and total hits
-	for(int j=0;j<MatC->rows;j++){
-		int nnz= 0;
-		while(totalHits[j][nnz]!=-1) {
-			MatC->nnz ++;
-			MatC->coo_r = (int *)realloc(MatC->coo_r,MatC->nnz*sizeof(int));
-			MatC->coo_c = (int *)realloc(MatC->coo_c,MatC->nnz*sizeof(int));
-			if (MatC->coo_c == NULL || MatC->coo_r==NULL)
-			{fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
-				exit(EXIT_FAILURE);}
-			MatC->coo_c[MatC->nnz-1] = j;
-			MatC->coo_r[MatC->nnz-1] = totalHits[j][nnz];
-			nnz++;
-		}
-	}
-	/* Free arrays allocated for omp */
-	for (int i=0;i<MatC->rows;i++) free(totalHits[i]);
-	free(totalHits);
 }
 /* This function sorts a COO Matrix sorted by row to COO Matrix sorted by column */
 /* Insertion Sort */

@@ -2,7 +2,6 @@
  * It iterates each columns of the B matrix and multiplies the with the elements
  * of matrix A. The program calculates the result by each column of result matrix C.
  * The implementation is sped up by OpenMP. Each thread is responsible for one column of B. */
-/* This is with a masked matrix that is in the implmentation */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -45,9 +44,6 @@ main(int argc, char *argv[]){
   /* Get MatB */
   cscMat MatB;
   MatB = readFile(argv[2]);
-  /* Get MatF */
-  cscMat MatF;
-  MatF = readFile(argv[3]);
   /* Init MatC*/
   cooMat MatC;
   MatC.rows=MatA.rows;
@@ -61,36 +57,33 @@ main(int argc, char *argv[]){
   /* This currently works for matrices RowsxRows */
   int ** totalHits = (int **)malloc(MatC.rows  * sizeof(int *));
   #pragma omp parallel for 
-  for(int j=0;j<MatF.rows;j++){
+  for(int j=0;j<MatC.rows;j++){
     //if (j%10000==0) printf("%d %d\n",j,omp_get_num_threads());
     //struct timespec start;
     //struct timespec end;
     //clock_gettime(CLOCK_MONOTONIC,&start);
-    /* Allocate a Mask for a column*/
-    int *maskCol = (int *)calloc(MatF.rows,sizeof(int));
-    int *hits = (int *)calloc(MatC.rows,sizeof(int));
-    if(hits==NULL || maskCol== NULL){
-      fprintf(stderr,"Line %d: Error Alocating Matrix hits",__LINE__);
-      exit(EXIT_FAILURE);
-    }
-    /* Iterate current column in mask and add the results to maskCol */
-    for (int c=MatF.csc_c[j];c<MatF.csc_c[j+1];c++){
-      int i =  MatF.csc_r[c];
-      maskCol[i] =1;
-    }
-
     /* Iterate B column */
+
     int * finalHits = NULL;
     int nnz=0;
     for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
       int MatArow=MatB.csc_r[c];
       for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
 	int i = MatA.csc_r[r];
-	if(hits[i]==0 && maskCol[i]==1){
-	nnz++;
-	hits[i]=1;
-        finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
-	finalHits[nnz-1] = i;
+	/* Set a flag that tracks if a same value (hit) is the answers */
+	int hitflag=0;
+	/* Check in current hits if this one exists */
+	for(int hit=0;hit<nnz;hit++){
+		if(i==finalHits[hit]) {
+			/* set the flag and break */
+			hitflag=1;
+			break;
+		}
+	}
+	if(hitflag==0){
+		nnz++;
+        	finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
+		finalHits[nnz-1] = i;
 	}
       }
     }
@@ -99,8 +92,6 @@ main(int argc, char *argv[]){
     finalHits[nnz-1] = -1;
 
     totalHits[j]=finalHits;
-    free(hits);
-    free(maskCol);
   //clock_gettime(CLOCK_MONOTONIC,&end);
   //double sec,nsec;
   //sec = end.tv_sec - start.tv_sec;
@@ -122,7 +113,6 @@ main(int argc, char *argv[]){
         MatC.coo_r[MatC.nnz-1] = totalHits[j][nnz];
         nnz++;
         }
-      free(totalHits[j]);
       }
   clock_gettime(CLOCK_MONOTONIC,&ts_end);
   double ts_sec,ts_nsec;
@@ -152,7 +142,7 @@ main(int argc, char *argv[]){
 
 
   /* Free arrays allocated for omp */
-  /* for (int i=0;i<MatC.rows;i++) free(totalHits[i]); //Added it to the above loop*/
+  for (int i=0;i<MatC.rows;i++) free(totalHits[i]);
   free(totalHits);
   /* Free csc arrays allocated from readFile(...)  */
   free(MatA.csc_r);
@@ -161,8 +151,6 @@ main(int argc, char *argv[]){
   free(MatB.csc_c);
   free(MatC.coo_r);
   free(MatC.coo_c);
-  free(MatF.csc_r);
-  free(MatF.csc_c);
 }
 
 
@@ -275,12 +263,9 @@ checkArgsNum(int argc){
       fprintf(stderr, "Line:%d No argument was given\n",__LINE__);
       exit(EXIT_FAILURE);
     case 2:
-      fprintf(stderr, "Line:%d Two arguments are missing\n",__LINE__);
-      exit(EXIT_FAILURE);
-    case 3:
       fprintf(stderr, "Line:%d One argument is missing\n",__LINE__);
       exit(EXIT_FAILURE);
-    case 4:
+    case 3:
       break;
     default:
       fprintf(stderr, "Line:%d More args given\n",__LINE__);
