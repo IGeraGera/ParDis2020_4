@@ -66,13 +66,6 @@ main(int argc, char *argv[]){
     //struct timespec start;
     //struct timespec end;
     //clock_gettime(CLOCK_MONOTONIC,&start);
-    /* Allocate hits*/
-    int *hits = (int *)calloc(MatC.rows,sizeof(int));
-    if(hits==NULL){
-      fprintf(stderr,"Line %d: Error Alocating Matrix hits",__LINE__);
-      exit(EXIT_FAILURE);
-    }
-
     /* Iterate B column */
     int * finalHits = NULL;
     int nnz=0;
@@ -93,9 +86,11 @@ main(int argc, char *argv[]){
 	/* Check again if the pointer passed the end  */
 	if (fpointer==fpointerend) break;	
 	/* if there is no hit and the row is in F the add it  */
-	if(hits[i]==0 && MatF.csc_r[fpointer]==i){
+	if(MatF.csc_r[fpointer]==i){
+	for(int hit=0;hit<nnz;hit++){
+		if(i==finalHits[hit]) break;
+	}
 	nnz++;
-	hits[i]=1;
         finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
 	finalHits[nnz-1] = i;
 	}
@@ -106,7 +101,6 @@ main(int argc, char *argv[]){
     finalHits[nnz-1] = -1;
 
     totalHits[j]=finalHits;
-    free(hits);
   //clock_gettime(CLOCK_MONOTONIC,&end);
   //double sec,nsec;
   //sec = end.tv_sec - start.tv_sec;
@@ -152,8 +146,8 @@ main(int argc, char *argv[]){
  
  */
 
-  /* puts("\nMATRIX C\n"); */
-  /* for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]); */
+  puts("\nMATRIX C\n");
+  for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]);
 
 
 
