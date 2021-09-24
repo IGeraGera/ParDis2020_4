@@ -58,6 +58,13 @@ main_hyb: mmio.o main_hyb.o
 
 main_hyb.o: main_hyb.c inc/mmio.h
 	$(MPICC) $(CFLAGS) -c main_hyb.c -fopenmp
+
+main_hyb_1: mmio.o main_hyb_1.o
+	$(MPICC) $(CFLAGS) -o $@ mmio.o main_hyb_1.o -fopenmp
+
+main_hyb_1.o: main_hyb_1.c inc/mmio.h
+	$(MPICC) $(CFLAGS) -c main_hyb_1.c -fopenmp
+
 #---------------------------------------------
 # Compiling libraries
 mmio.o: inc/mmio.c
@@ -74,3 +81,4 @@ clean:
 	rm -f main_mpi4 main_mpi4.o mmio.o
 	rm -f main_mpi4_1 main_mpi4_1.o mmio.o
 	rm -f main_hyb main_hyb.o mmio.o
+	rm -f main_hyb_1 main_hyb_1.o mmio.o
