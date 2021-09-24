@@ -344,7 +344,7 @@ main(int argc, char *argv[]){
 			/* Allocate an array that contains the hits for each column */
 			int **totalHits = (int **) malloc(MatrixArrA[Cptr].rows*sizeof(int*));
 			int *totalHitsSize = (int *) malloc(MatrixArrA[Cptr].rows*sizeof(int));
-			if (totalHits==NULL || totalHits==NULL){
+			if (totalHits==NULL || totalHitsSize==NULL){
 				printf("Memory allocation at line %d Failed\n",__LINE__);
 				exit(EXIT_FAILURE);
 			}
@@ -367,11 +367,19 @@ main(int argc, char *argv[]){
 					/* } */
 				} 
 			}
-			/* Maybe free total hits */
-			for(int num=0;num<MatrixArrA[Cptr].rows;num++) free(totalHits[num]);
-			free(totalHits);	
-			if(firstFlag==0) free(totalHitsSize);
-			/* Realloc space for the new elements */
+			/* Free totalHits and totalHitsSize */
+			/* Check if array is empty */
+			if (firstFlag!=1){
+				for(int num=0;num<MatrixArrA[Cptr].rows;num++) {
+					free(totalHits[num]);
+					totalHits[num]=NULL;
+				}
+			}
+			free(totalHits);
+			totalHits=NULL;
+			free(totalHitsSize);
+			totalHitsSize=NULL;
+			/* Allocate Memory for MatrixCooArrC */
 			int startIndex = MatrixCOOArrC.nnz;
 			MatrixCOOArrC.nnz+=tempSubC.nnz;
 			MatrixCOOArrC.coo_r = (int *)realloc(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz*sizeof(int));
