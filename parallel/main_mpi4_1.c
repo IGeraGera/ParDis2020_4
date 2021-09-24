@@ -465,6 +465,7 @@ main(int argc, char *argv[]){
 	free(MatC.coo_r);
 	free(MatC.coo_c);
 }
+/* Function that returns the min array */
 int
 imin(int a,int b){
 	if(a>=b) {return b;}
