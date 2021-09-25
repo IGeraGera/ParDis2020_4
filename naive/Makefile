@@ -48,6 +48,12 @@ main_naive: mmio.o main_naive.o
 main_naive.o: main_naive.c inc/mmio.h
 	$(CC) $(CFLAGS) -c main_naive.c
 
+main_naive_masked: mmio.o main_naive_masked.o
+	$(CC) $(CFLAGS) -o $@ mmio.o main_naive_masked.o
+
+main_naive_masked.o: main_naive_masked.c inc/mmio.h
+	$(CC) $(CFLAGS) -c main_naive_masked.c
+
 mmio.o: inc/mmio.c
 	$(CC) $(CFLAGS) -c inc/mmio.c
 
@@ -69,6 +75,8 @@ clean:
 	-rm -f main_simple
 	-rm -f main_naive.o
 	-rm -f main_naive
+	-rm -f main_naive_masked.o
+	-rm -f main_naive_masked
 	-rm -f main_4R_LUT.o
 	-rm -f main_4R_LUT
 	-rm -f main_simple2.o
