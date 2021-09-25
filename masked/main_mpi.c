@@ -34,7 +34,7 @@ void coo2csc(int * const row,int * const col,int const * const row_coo,
 		int const * const col_coo,int const nnz,int const n,int const isOneBased);
 cscMat readFile(char *filename);
 cooMat sortMat(cooMat Matrix);
-void matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag);
+void matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag);
 void checkCOOMat(cooMat *Mat,int idx);
 int imin(int a, int b);
 
@@ -49,6 +49,9 @@ main(int argc, char *argv[]){
 	/* Get MatB */
 	cscMat MatB;
 	MatB = readFile(argv[2]);
+	/* Get MatF */
+	cscMat MatF;
+	MatF = readFile(argv[3]);
 	/* Init MatC*/
 	cooMat MatC;
 	MatC.rows=MatA.rows;
@@ -64,8 +67,8 @@ main(int argc, char *argv[]){
 
 	/* MPI */
 	int numtasks,rank;
-	struct cooMatrix *MatrixCOOArrA, *MatrixCOOArrB, MatrixCOOArrC;
-	struct cscMatrix *privMatrixArrA, *MatrixArrB;
+	struct cooMatrix *MatrixCOOArrA, *MatrixCOOArrB, MatrixCOOArrC, *MatrixCOOArrF;
+	struct cscMatrix *privMatrixArrA, *MatrixArrB, *MatrixArrF;
 
 	MPI_Init(NULL,NULL);
 	MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
@@ -108,10 +111,11 @@ main(int argc, char *argv[]){
 	int totalWorkload=workEnd-workStart;
 	printf("rank %d start %d end %d\n",rank,workStart,workEnd);
 
-	/* Allocate an arrays that will contain the  blocks COO and CSC  */
+	/* Allocate an arrays that will contain the  blocks COO  */
 	MatrixCOOArrA = malloc(blockalloc*totalWorkload*sizeof(struct cooMatrix));
 	MatrixCOOArrB = malloc(blockalloc*totalWorkload*sizeof(struct cooMatrix));
-	if (MatrixCOOArrA==NULL || MatrixCOOArrB==NULL) {
+	MatrixCOOArrF = malloc(blockalloc*totalWorkload*sizeof(struct cooMatrix));
+	if (MatrixCOOArrA==NULL || MatrixCOOArrB==NULL || MatrixCOOArrF==NULL) {
 		printf("Memory allocation at line %d Failed\n",__LINE__);
 		exit(EXIT_FAILURE);
 	}
@@ -124,6 +128,10 @@ main(int argc, char *argv[]){
 		MatrixCOOArrB[i].coo_r=NULL;
 		MatrixCOOArrB[i].coo_c=NULL;
 		MatrixCOOArrB[i].rows=(int) floor(MatB.rows/block);
+		MatrixCOOArrF[i].nnz=0;
+		MatrixCOOArrF[i].coo_r=NULL;
+		MatrixCOOArrF[i].coo_c=NULL;
+		MatrixCOOArrF[i].rows=(int) floor(MatF.rows/block);
 	}
 
 	/* Disect each Matrix */
@@ -175,11 +183,35 @@ main(int argc, char *argv[]){
 			MatrixCOOArrB[ptr].coo_c[MatrixCOOArrB[ptr].nnz-1] = j - Arrj*MatrixCOOArrB[ptr].rows;
 		}
 	}
+	// F
+	for(int j=workStart*MatrixCOOArrA[0].rows;j<imin(workEnd*MatrixCOOArrA[0].rows,MatF.rows);j++){
+		for(int r=MatF.csc_c[j];r<MatF.csc_c[j+1];r++){
+			int i = MatF.csc_r[r];
+			/* Find Arri and Arrj  */
+			int Arri = (int) floor(i/MatrixCOOArrF[0].rows);
+			int Arrj = (int) floor(j/MatrixCOOArrF[0].rows);
+			//printf("Arri %d Arrj %d for i %d j %d \n",Arri,Arrj,i,j);
+
+			/* Check if structure exist in MatrixCOOArrF and allocate it */	  
+			int ptr = Arri +blockalloc*(Arrj-workStart);
+			MatrixCOOArrF[ptr].nnz ++;
+			MatrixCOOArrF[ptr].coo_r = (int *)realloc(MatrixCOOArrF[ptr].coo_r,MatrixCOOArrF[ptr].nnz*sizeof(int));
+			MatrixCOOArrF[ptr].coo_c = (int *)realloc(MatrixCOOArrF[ptr].coo_c,MatrixCOOArrF[ptr].nnz*sizeof(int));
+			if (MatrixCOOArrF[ptr].coo_c == NULL || MatrixCOOArrF[ptr].coo_r==NULL)
+			{fprintf(stderr,"Line %d: Error Alocating MatrixCOOArrF",__LINE__);
+				exit(EXIT_FAILURE);}
+			/* The final i and j that re pushed to the coo array are shifted to their relative
+			   positions in respect to the block coordinates */
+			MatrixCOOArrF[ptr].coo_r[MatrixCOOArrF[ptr].nnz-1] = i - Arri*MatrixCOOArrF[ptr].rows;
+			MatrixCOOArrF[ptr].coo_c[MatrixCOOArrF[ptr].nnz-1] = j - Arrj*MatrixCOOArrF[ptr].rows;
+		}
+	}
 	/* Covert All COO to CSC */
 	//TODO: Remember to free
 	privMatrixArrA =  malloc(blockalloc*totalWorkload*sizeof(struct cscMatrix));
 	MatrixArrB =  malloc(blockalloc*totalWorkload*sizeof(struct cscMatrix));
-	if (privMatrixArrA==NULL || MatrixArrB==NULL) {
+	MatrixArrF =  malloc(blockalloc*totalWorkload*sizeof(struct cscMatrix));
+	if (privMatrixArrA==NULL || MatrixArrB==NULL || MatrixArrF==NULL) {
 		printf("Memory allocation at line %d Failed\n",__LINE__);
 		exit(EXIT_FAILURE);
 	}
@@ -243,12 +275,42 @@ main(int argc, char *argv[]){
 			/* Free Memory */
 			free(MatrixCOOArrB[ptr].coo_r);
 			free(MatrixCOOArrB[ptr].coo_c);
+			// F
+			/* Declaration of CSC format arrays */ 
+			row = MatrixCOOArrF[ptr].rows;
+			nnz = MatrixCOOArrF[ptr].nnz;
+			isOneBased =0; 
+			/*Allocate memory for csc  matrices */
+			MatrixArrF[ptr].csc_r = (int *)malloc(nnz     * sizeof(int));
+			MatrixArrF[ptr].csc_c = (int *)malloc((row+1) * sizeof(int));
+			MatrixArrF[ptr].nnz = nnz;
+			MatrixArrF[ptr].rows =row;
+			MatrixArrF[ptr].i=i*row;
+			MatrixArrF[ptr].j=(j+workStart)*row;
+			if (MatrixArrF[ptr].csc_r==NULL || MatrixArrF[ptr].csc_c==NULL) {
+				printf("Memory allocation at line %d Failed\n",__LINE__);
+				exit(EXIT_FAILURE);
+			}
+			/* Conversion */	
+			if(MatrixCOOArrF[ptr].nnz==0){	// If the array is empty nnz=0 then the arrays are NULL
+				MatrixArrF[ptr].csc_r = NULL;
+				MatrixArrF[ptr].csc_c = NULL;
+			}
+			else{
+				coo2csc(MatrixArrF[ptr].csc_r,MatrixArrF[ptr].csc_c,
+						MatrixCOOArrF[ptr].coo_r,MatrixCOOArrF[ptr].coo_c,
+						nnz,row,isOneBased);
+			}
+			/* Free Memory */
+			free(MatrixCOOArrF[ptr].coo_r);
+			free(MatrixCOOArrF[ptr].coo_c);
 
 		}
 	}
 	/* Free Memory */
 	free(MatrixCOOArrA);
 	free(MatrixCOOArrB);
+	free(MatrixCOOArrF);
 	/* Allocate memory fore the common MatrixArrA */
 	struct cscMatrix *MatrixArrA =  malloc(blockalloc*blockalloc*sizeof(struct cscMatrix));
 	/* rankMat is an array containing the workEnd value of every proccess in order to find root */
@@ -305,17 +367,17 @@ main(int argc, char *argv[]){
 			}
 		}
 	}
-	/* #<{(| DEBUG Print the buckets |)}># */
-	/* if (rank==1){ */
+	/* DEBUG Print the buckets */
+	/* if (rank==0){ */
 	/* 	for(int i=0;i<blockalloc;i++){ */
-	/* 		for(int j=0;j<blockalloc;j++){ */
+	/* 		for(int j=0;j<totalWorkload;j++){ */
 	/* 			int ptr = i + blockalloc*j; */
-	/* 			printf("i %d j %d arri %d arrj%d \n",i,j,MatrixArrA[ptr].i,MatrixArrA[ptr].j); */
-	/* 			if(MatrixArrA[ptr].csc_c==NULL) {printf("NULL\n");continue;} */
-	/* 			for (int c=0;c<MatrixArrA[ptr].rows;c++){ */
-	/* 				for(int ci=MatrixArrA[ptr].csc_c[c];ci<MatrixArrA[ptr].csc_c[c+1];ci++){ */
-	/* 					int r = MatrixArrA[ptr].csc_r[ci]; */
-	/* 					printf("%d %d \n",r+MatrixArrA[ptr].i,c+MatrixArrA[ptr].j); */
+	/* 			printf("i %d j %d arri %d arrj%d \n",i,j,MatrixArrF[ptr].i,MatrixArrF[ptr].j); */
+	/* 			if(MatrixArrF[ptr].csc_c==NULL) {printf("NULL\n");continue;} */
+	/* 			for (int c=0;c<MatrixArrF[ptr].rows;c++){ */
+	/* 				for(int ci=MatrixArrF[ptr].csc_c[c];ci<MatrixArrF[ptr].csc_c[c+1];ci++){ */
+	/* 					int r = MatrixArrF[ptr].csc_r[ci]; */
+	/* 					printf("%d %d \n",r+MatrixArrF[ptr].i,c+MatrixArrF[ptr].j); */
 	/* 				} */
 	/* 			} */
 	/* 			puts("\n"); */
@@ -334,6 +396,7 @@ main(int argc, char *argv[]){
 		for (int Crow=0;Crow<blockalloc;Crow++){
 			/* This is the temp matrix that contain the total elements for a value*/
 			int Cptr = Crow+blockalloc*Ccol;
+			int Fptr = Crow+blockalloc*(Ccol-workStart);
 			cooMat tempSubC;
 			tempSubC.coo_r = (int *)malloc(sizeof(int));
 			tempSubC.coo_c = (int *)malloc(sizeof(int));
@@ -357,7 +420,7 @@ main(int argc, char *argv[]){
 				// If block is empty skip
 				if (MatrixArrA[Aptr].nnz>0 && MatrixArrB[Bptr].nnz>0){
 					/* Multiply the arrays A x B = Ctemp */
-					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],&tempSubC,totalHits,totalHitsSize,firstFlag);
+					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],MatrixArrF[Fptr],&tempSubC,totalHits,totalHitsSize,firstFlag);
 					firstFlag=0;
 					// DEBUG
 					/* if (rank ==0){ */
@@ -424,8 +487,8 @@ main(int argc, char *argv[]){
 	printf("Rank %d Execution Time %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
 	if(rank==0){
-		/* MatC = sortMat(MatC); */
-		/* for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1); */
+		MatC = sortMat(MatC);
+		for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1);
 		printf("NNZ %d\n",MatC.nnz);
 	}
 
@@ -487,7 +550,7 @@ checkCOOMat(cooMat *Mat,int idx){
 
 /* This routine Multiplies 2 csc matrixes */
 void 
-matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag){
+matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag){
 	/* This currently works for matrices RowsxRows */
 	for(int j=0;j<MatA.rows;j++){
 		/* Check if is the first pass and the totalHit is empty */
@@ -499,9 +562,22 @@ matrixMult(cscMat MatA, cscMat MatB, cooMat *MatC, int **totalHits, int *totalHi
 		/* Iterate B column */
 		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
 			int MatArow=MatB.csc_r[c];
+			/* Init F column pointer */
+			int fpointer = MatF.csc_c[j];
+			int fpointerend = MatF.csc_c[j+1];
 			for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
 				/* check if exist */
 				int i = MatA.csc_r[r];
+				/* Check iff the pointer reached the end  */
+				if (fpointer==fpointerend) break;	
+				/* if the row is lesser than the row the pointer points continue */
+				else if (i<MatF.csc_r[fpointer]) continue;
+				/* if the row is greater than the row the pointer points increment the pointer */
+				while(i>MatF.csc_r[fpointer] && fpointer<fpointerend) fpointer++;
+				/* Check again if the pointer passed the end  */
+				if (fpointer==fpointerend) break;	
+				/* Check if the mask row the same to conotinue*/
+				if (MatF.csc_r[fpointer]!=i) continue;
 				/* Set a flag that tracks if a same value (hit) is the answers */
 				int hitflag=0;
 				/* Check in current hits if this one exists */
@@ -670,9 +746,12 @@ checkArgsNum(int argc){
 			fprintf(stderr, "Line:%d No argument was given\n",__LINE__);
 			exit(EXIT_FAILURE);
 		case 2:
-			fprintf(stderr, "Line:%d One argument is missing\n",__LINE__);
+			fprintf(stderr, "Line:%d Two arguments are missing\n",__LINE__);
 			exit(EXIT_FAILURE);
 		case 3:
+			fprintf(stderr, "Line:%d One argument is missing\n",__LINE__);
+			exit(EXIT_FAILURE);
+		case 4:
 			break;
 		default:
 			fprintf(stderr, "Line:%d More args given\n",__LINE__);
