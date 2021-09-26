@@ -565,7 +565,7 @@ checkCOOMat(cooMat *Mat,int idx){
 void 
 matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, int **totalHits, int *totalHitsSize, int firstFlag){
 	/* This currently works for matrices RowsxRows */
-	#pragma parallel for
+	#pragma omp parallel for
 	for(int j=0;j<MatA.rows;j++){
 		/* Check if is the first pass and the totalHit is empty */
 		if(firstFlag==1){
