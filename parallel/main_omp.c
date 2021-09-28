@@ -56,7 +56,9 @@ main(int argc, char *argv[]){
   clock_gettime(CLOCK_MONOTONIC,&ts_start);
   /* This currently works for matrices RowsxRows */
   int ** totalHits = (int **)malloc(MatC.rows  * sizeof(int *));
-  #pragma omp parallel for 
+  #pragma omp parallel
+  {
+  #pragma omp for schedule(dynamic,256) nowait 
   for(int j=0;j<MatC.rows;j++){
     //if (j%10000==0) printf("%d %d\n",j,omp_get_num_threads());
     //struct timespec start;
@@ -97,6 +99,7 @@ main(int argc, char *argv[]){
   //sec = end.tv_sec - start.tv_sec;
   //nsec = end.tv_nsec - start.tv_nsec;
   //printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
+  }
   }
     /* Allocate memory */
   //TODO: free finalHits and total hits
