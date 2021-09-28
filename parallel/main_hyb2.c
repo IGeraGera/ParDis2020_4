@@ -82,6 +82,8 @@ main(int argc, char *argv[]){
 	MatrixCOOArrC.coo_r=NULL;
 	/* Start Calculating the result */
 	/* Assign columns of C to processes */
+	int **totalHits = (int **)malloc(totalWorkload*sizeof(int*))
+	int *totalHitsSize = (int *)malloc(totalWorkload*sizeof(int))
 	#pragma omp parallel
 	{
 	#pragma omp for nowait
@@ -101,27 +103,32 @@ main(int argc, char *argv[]){
 					}
 				}
 				if (hitflag==0){
-					#pragma omp critical
-					{
-					nnz++;
 					finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
 					finalHits[nnz-1] = i;
-					MatrixCOOArrC.nnz++;
-					MatrixCOOArrC.coo_c=(int *)realloc(MatrixCOOArrC.coo_c,MatrixCOOArrC.nnz*sizeof(int));
-					MatrixCOOArrC.coo_r=(int *)realloc(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz*sizeof(int));
-					if (MatrixCOOArrC.coo_c == NULL || MatrixCOOArrC.coo_r==NULL)
-					{fprintf(stderr,"Line %d: Error Alocating MatCOOArrC",__LINE__);
-						exit(EXIT_FAILURE);}
-					MatrixCOOArrC.coo_c[MatrixCOOArrC.nnz-1]=j;
-					MatrixCOOArrC.coo_r[MatrixCOOArrC.nnz-1]=i;
-					}
 				}
 
 			}
 		}
-		free(finalHits);
+		totalHits[j-workstart]=finalHits;
+		totalHitsSize[j]=nnz;
 	}
 	}
+
+	for (int j=0;j<totalWorkload;j++){
+		for(int el=0;el<totalHitsSize[j];el++){
+			int i = totalHits[j][el];
+			MatrixCOOArrC.nnz++;
+			MatrixCOOArrC.coo_c=(int *)realloc(MatrixCOOArrC.coo_c,MatrixCOOArrC.nnz*sizeof(int));
+			MatrixCOOArrC.coo_r=(int *)realloc(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz*sizeof(int));
+			if (MatrixCOOArrC.coo_c == NULL || MatrixCOOArrC.coo_r==NULL)
+			{fprintf(stderr,"Line %d: Error Alocating MatCOOArrC",__LINE__);
+				exit(EXIT_FAILURE);}
+			MatrixCOOArrC.coo_c[MatrixCOOArrC.nnz-1]=j;
+			MatrixCOOArrC.coo_r[MatrixCOOArrC.nnz-1]=i;
+		}
+	
+	}
+
 
 
 
