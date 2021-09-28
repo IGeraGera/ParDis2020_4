@@ -1,4 +1,4 @@
-/*TODO: Add a header  */
+/* This is implementaion uses MPI without dissecting the matrix  */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -69,7 +69,7 @@ main(int argc, char *argv[]){
 	MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	/* Block size for each axis */
-	int block = (int)ceil(MatC.rows/numtasks);
+	int block =(int)ceil(((float)MatC.rows)/((float)numtasks)) ;
 	/* Assign the workload to every thread */
 	/* Every process gets a block of columns to calculate from the matrix C */
 	int workStart,workEnd;

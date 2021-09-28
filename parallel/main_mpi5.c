@@ -66,7 +66,7 @@ main(int argc, char *argv[]){
 	MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	/* Block size for each axis */
-	int block = (int)ceil(MatC.rows/numtasks);
+	int block =(int)ceil(((float)MatC.rows)/((float)numtasks)) ;
 	/* Assign the workload to every thread */
 	/* Every process gets a block of columns to calculate from the matrix C */
 	int workStart,workEnd;
@@ -92,9 +92,10 @@ main(int argc, char *argv[]){
 				int i = MatA.csc_r[r];
 				int hitflag=0;
 				for(int hit=0;hit<nnz;hit++){
-					if(i==finalHits[hit]) 
+					if(i==finalHits[hit]) {
 						hitflag=1;
-					break;
+						break;
+					}
 				}
 				if (hitflag==0){
 					nnz++;
@@ -118,12 +119,11 @@ main(int argc, char *argv[]){
 
 
 
-	//sortMat(MatrixCOOArrC);
-	/* if(rank==2){ */
-	/* 	puts("\nMATRIX C\n"); */
-	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
-	/* } */ 
 	/* Get the displacement to fit the arrays */
+	/* if (rank==0) { */
+	/* 	printf("nnz %d\n",MatrixCOOArrC.nnz); */
+	/* 	for (int i=0; i<MatrixCOOArrC.nnz;i++) printf("i %d j %d \n",MatrixCOOArrC.coo_r[i],MatrixCOOArrC.coo_c[i]); */
+	/* } */
 	int recvcount[numtasks], displs[numtasks];
 	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
 	/* MPI Gather the array */
@@ -146,8 +146,8 @@ main(int argc, char *argv[]){
 	printf("Rank %d Execution Time %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
 	if(rank==0){
-		/* MatC = sortMat(MatC); */
-		/* for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1); */
+		MatC = sortMat(MatC);
+		for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1);
 		printf("NNZ %d\n",MatC.nnz);
 	}
 
