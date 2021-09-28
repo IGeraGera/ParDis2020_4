@@ -85,7 +85,9 @@ main(int argc, char *argv[]){
 	MatrixCOOArrC.coo_r=NULL;
 	/* Start Calculating the result */
 	/* Assign columns of C to processes */
-	#pragma omp parallel for
+	#pragma omp parallel 
+	{
+	#pragma omp for  nowait
 	for(int j=workStart;j<workEnd;j++){
 		int * finalHits = NULL;
 		int nnz=0;
@@ -113,6 +115,8 @@ main(int argc, char *argv[]){
 					nnz++;
 					finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
 					finalHits[nnz-1] = i;
+					# pragma omp critical
+					{
 					MatrixCOOArrC.nnz++;
 					MatrixCOOArrC.coo_c=(int *)realloc(MatrixCOOArrC.coo_c,MatrixCOOArrC.nnz*sizeof(int));
 					MatrixCOOArrC.coo_r=(int *)realloc(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz*sizeof(int));
@@ -121,11 +125,13 @@ main(int argc, char *argv[]){
 						exit(EXIT_FAILURE);}
 					MatrixCOOArrC.coo_c[MatrixCOOArrC.nnz-1]=j;
 					MatrixCOOArrC.coo_r[MatrixCOOArrC.nnz-1]=i;
+					}
 
 				}
 			}
 		}
 		free(finalHits);
+	}
 	}
 
 
