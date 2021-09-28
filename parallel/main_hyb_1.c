@@ -181,7 +181,6 @@ main(int argc, char *argv[]){
 		printf("Memory allocation at line %d Failed\n",__LINE__);
 		exit(EXIT_FAILURE);
 	}
-	#pragma omp parallel for schedule(dynamic,1) 
 	for(int i=0;i<blockalloc;i++){
 		for(int j=0;j<totalWorkload;j++){
 			int ptr = i + blockalloc*j;
@@ -490,7 +489,7 @@ matrixMult(cscMat MatA, cscMat MatB, int **totalHits, int *totalHitsSize, int fi
 	/* This currently works for matrices RowsxRows */
 	#pragma omp parallel 
 	{
-	#pragma omp for schedule(dynamic,256) nowait 
+	#pragma omp for  nowait 
 	for(int j=0;j<MatA.rows;j++){
 		/* Check if is the first pass and the totalHit is empty */
 		if(firstFlag==1){
