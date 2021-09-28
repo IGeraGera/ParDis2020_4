@@ -490,7 +490,7 @@ matrixMult(cscMat MatA, cscMat MatB, int **totalHits, int *totalHitsSize, int fi
 	/* This currently works for matrices RowsxRows */
 	#pragma omp parallel 
 	{
-	#pragma omp parallel for schecdule(dynamic,256) nowait 
+	#pragma omp for schedule(dynamic,256) nowait 
 	for(int j=0;j<MatA.rows;j++){
 		/* Check if is the first pass and the totalHit is empty */
 		if(firstFlag==1){
