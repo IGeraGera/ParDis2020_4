@@ -85,10 +85,10 @@ main(int argc, char *argv[]){
 	MatrixCOOArrC.coo_r=NULL;
 	/* Start Calculating the result */
 	/* Assign columns of C to processes */
+	#pragma omp parallel for
 	for(int j=workStart;j<workEnd;j++){
 		int * finalHits = NULL;
 		int nnz=0;
-		#pragma omp parallel for
 		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
 			int MatArow=MatB.csc_r[c];
 			/* Init F column pointer */
@@ -107,8 +107,6 @@ main(int argc, char *argv[]){
 				if (fpointer==fpointerend) break;	
 				/* if there is no hit and the row is in F the add it  */
 				if(MatF.csc_r[fpointer]==i){
-					#pragma omp critical
-					{
 					for(int hit=0;hit<nnz;hit++){
 						if(i==finalHits[hit]) break;
 					}
@@ -123,7 +121,6 @@ main(int argc, char *argv[]){
 						exit(EXIT_FAILURE);}
 					MatrixCOOArrC.coo_c[MatrixCOOArrC.nnz-1]=j;
 					MatrixCOOArrC.coo_r[MatrixCOOArrC.nnz-1]=i;
-					}
 
 				}
 			}
