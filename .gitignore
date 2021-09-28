@@ -3,6 +3,7 @@
 naive/russians
 naive/main
 # FILES
+*main_naive_masked
 *main_mpi
 *main_simple3
 *main_hyb
