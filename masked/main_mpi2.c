@@ -66,7 +66,6 @@ main(int argc, char *argv[]){
 	/* MPI */
 	int numtasks,rank;
 	MPI_Init(NULL,NULL);
-	puts("PASS");
 	MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	/* Block size for each axis */
@@ -122,11 +121,7 @@ main(int argc, char *argv[]){
 				}
 			}
 		}
-		//clock_gettime(CLOCK_MONOTONIC,&end);
-		//double sec,nsec;
-		//sec = end.tv_sec - start.tv_sec;
-		//nsec = end.tv_nsec - start.tv_nsec;
-		//printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
+		free(finalHits);
 	}
 
 
