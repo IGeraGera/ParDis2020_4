@@ -181,7 +181,7 @@ main(int argc, char *argv[]){
 		printf("Memory allocation at line %d Failed\n",__LINE__);
 		exit(EXIT_FAILURE);
 	}
-	#pragma omp parallel for schedule(dynamic,1) nowait
+	#pragma omp parallel for schedule(dynamic,1) 
 	for(int i=0;i<blockalloc;i++){
 		for(int j=0;j<totalWorkload;j++){
 			int ptr = i + blockalloc*j;
