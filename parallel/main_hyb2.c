@@ -161,8 +161,8 @@ main(int argc, char *argv[]){
 	printf("Rank %d Execution Time %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
 	if(rank==0){
-		MatC = sortMat(MatC);
-		for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1);
+		/* MatC = sortMat(MatC); */
+		/* for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1); */
 		printf("NNZ %d\n",MatC.nnz);
 	}
 
