@@ -103,6 +103,7 @@ main(int argc, char *argv[]){
 					}
 				}
 				if (hitflag==0){
+					nnz++;
 					finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
 					finalHits[nnz-1] = i;
 				}
@@ -110,7 +111,7 @@ main(int argc, char *argv[]){
 			}
 		}
 		totalHits[j-workStart]=finalHits;
-		totalHitsSize[j]=nnz;
+		totalHitsSize[j-workStart]=nnz;
 	}
 	}
 
