@@ -109,7 +109,7 @@ main(int argc, char *argv[]){
 
 			}
 		}
-		totalHits[j-workstart]=finalHits;
+		totalHits[j-workStart]=finalHits;
 		totalHitsSize[j]=nnz;
 	}
 	}
