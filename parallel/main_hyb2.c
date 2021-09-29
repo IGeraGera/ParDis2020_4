@@ -82,8 +82,8 @@ main(int argc, char *argv[]){
 	MatrixCOOArrC.coo_r=NULL;
 	/* Start Calculating the result */
 	/* Assign columns of C to processes */
-	int **totalHits = (int **)malloc(totalWorkload*sizeof(int*))
-	int *totalHitsSize = (int *)malloc(totalWorkload*sizeof(int))
+	int **totalHits = (int **)malloc(totalWorkload*sizeof(int*));
+	int *totalHitsSize = (int *)malloc(totalWorkload*sizeof(int));
 	#pragma omp parallel
 	{
 	#pragma omp for nowait
