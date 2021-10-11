@@ -11,6 +11,5 @@ naive/main
 *main_omp2
 *main_naive
 .*.swp
-*.md
 *.swp
 *.o
