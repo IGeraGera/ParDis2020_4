@@ -1,4 +1,5 @@
-/* This is implementaion uses MPI + OMP without dissecting the matrix  */
+/* This is implementaion uses MPI+openMP without dissecting the matrix with the matrix F. The workload for MPI is assigned statically.
+ * The OpenMP library parallelize the MPI workload.  */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -8,6 +9,7 @@
 #include<time.h>
 #include<math.h>
 #include"inc/mmio.h"
+#include<omp.h>
 #include"mpi.h"
 extern int errno ;
 /* Structs Declaration */
@@ -134,14 +136,6 @@ main(int argc, char *argv[]){
 	}
 	}
 
-
-
-
-	//sortMat(MatrixCOOArrC);
-	/* if(rank==2){ */
-	/* 	puts("\nMATRIX C\n"); */
-	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
-	/* } */ 
 	/* Get the displacement to fit the arrays */
 	int recvcount[numtasks], displs[numtasks];
 	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
@@ -221,63 +215,6 @@ checkCOOMat(cooMat *Mat,int idx){
 	}
 }
 
-/* This routine Multiplies 2 csc matrixes */
-void 
-matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag){
-	/* This currently works for matrices RowsxRows */
-	for(int j=0;j<MatA.rows;j++){
-		/* Check if is the first pass and the totalHit is empty */
-		if(firstFlag==1){
-			/* set finalHits to NULL */
-			totalHits[j]=NULL;
-			totalHitsSize[j]=0;
-		}
-		/* Iterate B column */
-		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
-			int MatArow=MatB.csc_r[c];
-			/* Init F column pointer */
-			int fpointer = MatF.csc_c[j];
-			int fpointerend = MatF.csc_c[j+1];
-			for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
-				/* check if exist */
-				int i = MatA.csc_r[r];
-				/* Check iff the pointer reached the end  */
-				if (fpointer==fpointerend) break;	
-				/* if the row is lesser than the row the pointer points continue */
-				else if (i<MatF.csc_r[fpointer]) continue;
-				/* if the row is greater than the row the pointer points increment the pointer */
-				while(i>MatF.csc_r[fpointer] && fpointer<fpointerend) fpointer++;
-				/* Check again if the pointer passed the end  */
-				if (fpointer==fpointerend) break;	
-				/* Check if the mask row the same to conotinue*/
-				if (MatF.csc_r[fpointer]!=i) continue;
-				/* Set a flag that tracks if a same value (hit) is the answers */
-				int hitflag=0;
-				/* Check in current hits if this one exists */
-				for(int hit=0;hit<totalHitsSize[j];hit++){
-					if(i==totalHits[j][hit]) {
-						/* set the flag and break */
-						hitflag=1;
-						break;
-					}
-				}
-				/* If there is no hit then put the answer to the MatC and to the totalHits */
-				if(hitflag==0){
-					
-					totalHitsSize[j]++;
-					totalHits[j] = (int *)realloc(totalHits[j],totalHitsSize[j]*sizeof(int));
-					if (totalHits[j]==NULL) exit(EXIT_FAILURE);
-					totalHits[j][totalHitsSize[j]-1] = i;
-					MatC->nnz ++;
-					checkCOOMat(MatC,MatC->nnz-1);
-					MatC->coo_r[MatC->nnz-1] = i;
-					MatC->coo_c[MatC->nnz-1] = j;
-				}
-
-			}
-		}
-	}
-}
 /* This function sorts a COO Matrix sorted by row to COO Matrix sorted by column */
 /* Insertion Sort */
 cooMat

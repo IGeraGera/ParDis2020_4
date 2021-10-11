@@ -1,4 +1,4 @@
-/*TODO: Add a header  */
+/* MPI only implementation with matrix dissection. The matrixes are dissected and the A matrix is broadcasted to every process. */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -34,7 +34,7 @@ void coo2csc(int * const row,int * const col,int const * const row_coo,
 		int const * const col_coo,int const nnz,int const n,int const isOneBased);
 cscMat readFile(char *filename);
 cooMat sortMat(cooMat Matrix);
-void matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, int **totalHits, int *totalHitsSize, int firstFlag);
+void matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag);
 void checkCOOMat(cooMat *Mat,int idx);
 int imin(int a, int b);
 
@@ -367,24 +367,6 @@ main(int argc, char *argv[]){
 			}
 		}
 	}
-	/* DEBUG Print the buckets */
-	/* if (rank==0){ */
-	/* 	for(int i=0;i<blockalloc;i++){ */
-	/* 		for(int j=0;j<totalWorkload;j++){ */
-	/* 			int ptr = i + blockalloc*j; */
-	/* 			printf("i %d j %d arri %d arrj%d \n",i,j,MatrixArrF[ptr].i,MatrixArrF[ptr].j); */
-	/* 			if(MatrixArrF[ptr].csc_c==NULL) {printf("NULL\n");continue;} */
-	/* 			for (int c=0;c<MatrixArrF[ptr].rows;c++){ */
-	/* 				for(int ci=MatrixArrF[ptr].csc_c[c];ci<MatrixArrF[ptr].csc_c[c+1];ci++){ */
-	/* 					int r = MatrixArrF[ptr].csc_r[ci]; */
-	/* 					printf("%d %d \n",r+MatrixArrF[ptr].i,c+MatrixArrF[ptr].j); */
-	/* 				} */
-	/* 			} */
-	/* 			puts("\n"); */
-	/* 		} */
-	/* 	} */
-	/* } */
-	/* exit(EXIT_SUCCESS) ; */
 	MatrixCOOArrC.nnz=0;
 	MatrixCOOArrC.coo_c=NULL;
 	MatrixCOOArrC.coo_r=NULL;
@@ -420,37 +402,18 @@ main(int argc, char *argv[]){
 				// If block is empty skip
 				if (MatrixArrA[Aptr].nnz>0 && MatrixArrB[Bptr].nnz>0){
 					/* Multiply the arrays A x B = Ctemp */
-					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],MatrixArrF[Fptr],totalHits,totalHitsSize,firstFlag);
+					matrixMult(MatrixArrA[Aptr],MatrixArrB[Bptr],MatrixArrF[Fptr],&tempSubC,totalHits,totalHitsSize,firstFlag);
 					firstFlag=0;
-					// DEBUG
-					/* if (rank ==0){ */
-					/* for (int i=0;i<tempC.nnz;i++){ */
-					/* 	if(rank==0) printf("Arri %d Arrj %d i %d j %d\n",Crow,Ccol,tempC.coo_r[i]+MatrixArrA[Cptr].i+1,tempC.coo_c[i]+MatrixArrA[Cptr].j+1); */
-					/* } */
-					/* } */
 				} 
 			}
 			/* Free totalHits and totalHitsSize */
 			/* Check if array is empty */
-			/* The Last time create the MatrixCOOArrC */
-			/* Allocate memory */
-			if(firstFlag!=1){
-				for(int j=0;j<MatrixArrA[Cptr].rows;j++){
-					int nnz= 0;
-					for (int nnz=0;nnz<totalHitsSize[j];nnz++){
-						tempSubC.nnz ++;
-						tempSubC.coo_r = (int *)realloc(tempSubC.coo_r,tempSubC.nnz*sizeof(int));
-						tempSubC.coo_c = (int *)realloc(tempSubC.coo_c,tempSubC.nnz*sizeof(int));
-						if (tempSubC.coo_c == NULL || tempSubC.coo_r==NULL)
-						{fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
-							exit(EXIT_FAILURE);}
-						tempSubC.coo_c[tempSubC.nnz-1] = j;
-						tempSubC.coo_r[tempSubC.nnz-1] = totalHits[j][nnz];
-					}
-					free(totalHits[j]);
+			if (firstFlag!=1){
+				for(int num=0;num<MatrixArrA[Cptr].rows;num++) {
+					free(totalHits[num]);
+					totalHits[num]=NULL;
 				}
 			}
-			/* Free arrays allocated for omp */
 			free(totalHits);
 			totalHits=NULL;
 			free(totalHitsSize);
@@ -472,11 +435,6 @@ main(int argc, char *argv[]){
 			free(tempSubC.coo_c);
 		}
 	}
-	//sortMat(MatrixCOOArrC);
-	/* if(rank==2){ */
-	/* 	puts("\nMATRIX C\n"); */
-	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
-	/* } */ 
 	/* Get the displacement to fit the arrays */
 	int recvcount[numtasks], displs[numtasks];
 	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
@@ -563,9 +521,8 @@ checkCOOMat(cooMat *Mat,int idx){
 
 /* This routine Multiplies 2 csc matrixes */
 void 
-matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, int **totalHits, int *totalHitsSize, int firstFlag){
+matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag){
 	/* This currently works for matrices RowsxRows */
-	#pragma omp parallel for
 	for(int j=0;j<MatA.rows;j++){
 		/* Check if is the first pass and the totalHit is empty */
 		if(firstFlag==1){
@@ -609,6 +566,10 @@ matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, int **totalHits, int *totalHit
 					totalHits[j] = (int *)realloc(totalHits[j],totalHitsSize[j]*sizeof(int));
 					if (totalHits[j]==NULL) exit(EXIT_FAILURE);
 					totalHits[j][totalHitsSize[j]-1] = i;
+					MatC->nnz ++;
+					checkCOOMat(MatC,MatC->nnz-1);
+					MatC->coo_r[MatC->nnz-1] = i;
+					MatC->coo_c[MatC->nnz-1] = j;
 				}
 
 			}

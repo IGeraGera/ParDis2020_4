@@ -1,4 +1,8 @@
-/* This is implementaion uses MPI without dissecting the matrix  */
+/* This method uses 2 CSC matrices and iterates the CSC matrices.
+ * It iterates each columns of the B matrix and multiplies the with the elements
+ * of matrix A. The program calculates the result by each column of result matrix C.
+ * The implementation is sped up by OpenMP. Each thread is responsible for one column of B. 
+ * This implementation is masked by the matrix F */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -6,9 +10,9 @@
 #include<string.h>
 #include<sys/time.h>
 #include<time.h>
-#include<math.h>
 #include"inc/mmio.h"
-#include"mpi.h"
+#include<omp.h>
+#include<math.h>
 extern int errno ;
 /* Structs Declaration */
 typedef struct cscMatrix{
@@ -16,17 +20,12 @@ typedef struct cscMatrix{
 	int *csc_c;
 	int nnz;
 	int rows;
-	int i;
-	int j;
 }cscMat;
 typedef struct cooMatrix{
 	int *coo_r;
 	int *coo_c;
 	int nnz;
 	int rows;
-	int i;
-	int j;
-	int size;
 }cooMat;
 /* Function Predeclarations */
 void checkArgsNum(int argc);
@@ -34,9 +33,6 @@ void coo2csc(int * const row,int * const col,int const * const row_coo,
 		int const * const col_coo,int const nnz,int const n,int const isOneBased);
 cscMat readFile(char *filename);
 cooMat sortMat(cooMat Matrix);
-void matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag);
-void checkCOOMat(cooMat *Mat,int idx);
-int imin(int a, int b);
 
 /* <<< --- MAIN --- >>> */
 int
@@ -61,31 +57,16 @@ main(int argc, char *argv[]){
 	/* Timing variables< */
 	struct timespec ts_start;
 	struct timespec ts_end;
-	double ts_sec,ts_nsec;
 	clock_gettime(CLOCK_MONOTONIC,&ts_start);
-	/* MPI */
-	int numtasks,rank;
-	MPI_Init(NULL,NULL);
-	MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
-	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-	/* Block size for each axis */
-	int block =(int)ceil(((float)MatC.rows)/((float)numtasks)) ;
-	/* Assign the workload to every thread */
-	/* Every process gets a block of columns to calculate from the matrix C */
-	int workStart,workEnd;
-	workStart = block*rank;
-	workEnd = workStart+block;
-	if(workEnd>MatC.rows) workEnd=MatC.rows;
-	int totalWorkload=workEnd-workStart;
-	printf("rank %d start %d end %d\n",rank,workStart,workEnd);
-
-	struct cooMatrix MatrixCOOArrC;
-	MatrixCOOArrC.nnz=0;
-	MatrixCOOArrC.coo_c=NULL;
-	MatrixCOOArrC.coo_r=NULL;
-	/* Start Calculating the result */
-	/* Assign columns of C to processes */
-	for(int j=workStart;j<workEnd;j++){
+	/* This currently works for matrices RowsxRows */
+	int ** totalHits = (int **)malloc(MatC.rows  * sizeof(int *));
+#pragma omp parallel for 
+	for(int j=0;j<MatF.rows;j++){
+		//if (j%10000==0) printf("%d %d\n",j,omp_get_num_threads());
+		//struct timespec start;
+		//struct timespec end;
+		//clock_gettime(CLOCK_MONOTONIC,&start);
+		/* Iterate B column */
 		int * finalHits = NULL;
 		int nnz=0;
 		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
@@ -112,56 +93,44 @@ main(int argc, char *argv[]){
 					nnz++;
 					finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
 					finalHits[nnz-1] = i;
-					MatrixCOOArrC.nnz++;
-					MatrixCOOArrC.coo_c=(int *)realloc(MatrixCOOArrC.coo_c,MatrixCOOArrC.nnz*sizeof(int));
-					MatrixCOOArrC.coo_r=(int *)realloc(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz*sizeof(int));
-					if (MatrixCOOArrC.coo_c == NULL || MatrixCOOArrC.coo_r==NULL)
-					{fprintf(stderr,"Line %d: Error Alocating MatCOOArrC",__LINE__);
-						exit(EXIT_FAILURE);}
-					MatrixCOOArrC.coo_c[MatrixCOOArrC.nnz-1]=j;
-					MatrixCOOArrC.coo_r[MatrixCOOArrC.nnz-1]=i;
-
 				}
 			}
 		}
-		free(finalHits);
+		nnz++;
+		finalHits = (int *)realloc(finalHits,nnz*sizeof(int));
+		finalHits[nnz-1] = -1;
+
+		totalHits[j]=finalHits;
+		//clock_gettime(CLOCK_MONOTONIC,&end);
+		//double sec,nsec;
+		//sec = end.tv_sec - start.tv_sec;
+		//nsec = end.tv_nsec - start.tv_nsec;
+		//printf("Execution Time %f ms\n",sec*1000+nsec/1000000);
 	}
-
-
-
-
-	//sortMat(MatrixCOOArrC);
-	/* if(rank==2){ */
-	/* 	puts("\nMATRIX C\n"); */
-	/* 	for (int i =0 ;i<MatrixCOOArrC.nnz;i++) printf("%d %d\n",MatrixCOOArrC.coo_r[i]+1,MatrixCOOArrC.coo_c[i]+1); */
-	/* } */ 
-	/* Get the displacement to fit the arrays */
-	int recvcount[numtasks], displs[numtasks];
-	MPI_Gather(&MatrixCOOArrC.nnz,1,MPI_INT,recvcount,1,MPI_INT,0,MPI_COMM_WORLD);
-	/* MPI Gather the array */
-	if(rank==0){
-		displs[0]=0;
-		for (int i=0;i<numtasks;i++)	MatC.nnz += recvcount[i];
-		for (int i=0;i<numtasks-1;i++) 	displs[i+1]=displs[i]+recvcount[i];	
-		MatC.coo_r = (int *) malloc(MatC.nnz*sizeof(int));
-		MatC.coo_c = (int *) malloc(MatC.nnz*sizeof(int));
+	/* Allocate memory */
+	//TODO: free finalHits and total hits
+	for(int j=0;j<MatC.rows;j++){
+		int nnz= 0;
+		while(totalHits[j][nnz]!=-1) {
+			MatC.nnz ++;
+			MatC.coo_r = (int *)realloc(MatC.coo_r,MatC.nnz*sizeof(int));
+			MatC.coo_c = (int *)realloc(MatC.coo_c,MatC.nnz*sizeof(int));
+			if (MatC.coo_c == NULL || MatC.coo_r==NULL)
+			{fprintf(stderr,"Line %d: Error Alocating Matrix C",__LINE__);
+				exit(EXIT_FAILURE);}
+			MatC.coo_c[MatC.nnz-1] = j;
+			MatC.coo_r[MatC.nnz-1] = totalHits[j][nnz];
+			nnz++;
+		}
+		free(totalHits[j]);
 	}
-	MPI_Gatherv(MatrixCOOArrC.coo_r,MatrixCOOArrC.nnz,MPI_INT,
-		    MatC.coo_r,recvcount,displs,MPI_INT,0,MPI_COMM_WORLD);
-	MPI_Gatherv(MatrixCOOArrC.coo_c,MatrixCOOArrC.nnz,MPI_INT,
-		    MatC.coo_c,recvcount,displs,MPI_INT,0,MPI_COMM_WORLD);
-	/* MPI END */ 
-	MPI_Finalize();
 	clock_gettime(CLOCK_MONOTONIC,&ts_end);
+	double ts_sec,ts_nsec;
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
-	printf("Rank %d Execution Time %f ms\n",rank,ts_sec*1000+ts_nsec/1000000);
+	printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
 	/* Sort MatC by column for tests  */
-	if(rank==0){
-		MatC = sortMat(MatC);
-		for (int i=0 ; i<MatC.nnz;i++) printf("Num %d i %d j %d \n",i+1,MatC.coo_r[i]+1,MatC.coo_c[i]+1);
-		printf("NNZ %d\n",MatC.nnz);
-	}
+	/* MatC = sortMat(MatC); */
 
 	/* DEBUGGING PRINTOUTS */
 	/* 
@@ -177,100 +146,26 @@ main(int argc, char *argv[]){
 
 */
 
-	  /* puts("\nMATRIX C\n"); */
-	  /* for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]); */
+	puts("\nMATRIX C\n");
+	for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]);
 
 
-	/* Deallocate Matrices */
-	free(MatrixCOOArrC.coo_c);
-	free(MatrixCOOArrC.coo_r);
+
+	/* Free arrays allocated for omp */
+	/* for (int i=0;i<MatC.rows;i++) free(totalHits[i]); //Added it to the above loop*/
+	free(totalHits);
 	/* Free csc arrays allocated from readFile(...)  */
 	free(MatA.csc_r);
 	free(MatA.csc_c);
 	free(MatB.csc_r);
 	free(MatB.csc_c);
-	free(MatF.csc_r);
-	free(MatF.csc_c);
 	free(MatC.coo_r);
 	free(MatC.coo_c);
-}
-/* Function that returns the min array */
-int
-imin(int a,int b){
-	if(a>=b) {return b;}
-	else {return a;}
-}
-void
-checkCOOMat(cooMat *Mat,int idx){
-	/* Check If the Size is larger that the index and allocate more space*/
-	if (Mat->size==(idx+1) ){
-		Mat->size*=2;
-		Mat->coo_r = (int *) realloc(Mat->coo_r,Mat->size*sizeof(int));
-		Mat->coo_c = (int *) realloc(Mat->coo_c,Mat->size*sizeof(int));
-		if (Mat->coo_c == NULL || Mat->coo_r==NULL)
-			{fprintf(stderr,"Line %d: Error reallocating coo matrix",__LINE__);
-				exit(EXIT_FAILURE);}
-
-	}
+	free(MatF.csc_r);
+	free(MatF.csc_c);
 }
 
-/* This routine Multiplies 2 csc matrixes */
-void 
-matrixMult(cscMat MatA, cscMat MatB, cscMat MatF, cooMat *MatC, int **totalHits, int *totalHitsSize, int firstFlag){
-	/* This currently works for matrices RowsxRows */
-	for(int j=0;j<MatA.rows;j++){
-		/* Check if is the first pass and the totalHit is empty */
-		if(firstFlag==1){
-			/* set finalHits to NULL */
-			totalHits[j]=NULL;
-			totalHitsSize[j]=0;
-		}
-		/* Iterate B column */
-		for (int c=MatB.csc_c[j];c<MatB.csc_c[j+1];c++){
-			int MatArow=MatB.csc_r[c];
-			/* Init F column pointer */
-			int fpointer = MatF.csc_c[j];
-			int fpointerend = MatF.csc_c[j+1];
-			for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
-				/* check if exist */
-				int i = MatA.csc_r[r];
-				/* Check iff the pointer reached the end  */
-				if (fpointer==fpointerend) break;	
-				/* if the row is lesser than the row the pointer points continue */
-				else if (i<MatF.csc_r[fpointer]) continue;
-				/* if the row is greater than the row the pointer points increment the pointer */
-				while(i>MatF.csc_r[fpointer] && fpointer<fpointerend) fpointer++;
-				/* Check again if the pointer passed the end  */
-				if (fpointer==fpointerend) break;	
-				/* Check if the mask row the same to conotinue*/
-				if (MatF.csc_r[fpointer]!=i) continue;
-				/* Set a flag that tracks if a same value (hit) is the answers */
-				int hitflag=0;
-				/* Check in current hits if this one exists */
-				for(int hit=0;hit<totalHitsSize[j];hit++){
-					if(i==totalHits[j][hit]) {
-						/* set the flag and break */
-						hitflag=1;
-						break;
-					}
-				}
-				/* If there is no hit then put the answer to the MatC and to the totalHits */
-				if(hitflag==0){
-					
-					totalHitsSize[j]++;
-					totalHits[j] = (int *)realloc(totalHits[j],totalHitsSize[j]*sizeof(int));
-					if (totalHits[j]==NULL) exit(EXIT_FAILURE);
-					totalHits[j][totalHitsSize[j]-1] = i;
-					MatC->nnz ++;
-					checkCOOMat(MatC,MatC->nnz-1);
-					MatC->coo_r[MatC->nnz-1] = i;
-					MatC->coo_c[MatC->nnz-1] = j;
-				}
 
-			}
-		}
-	}
-}
 /* This function sorts a COO Matrix sorted by row to COO Matrix sorted by column */
 /* Insertion Sort */
 cooMat
@@ -291,38 +186,6 @@ sortMat(cooMat Matrix){
 				}
 			}
 		}
-	}
-	int end,start,offset;
-	end =0;
-	while(1){
-		start = end;
-		offset=1;
-		while(1){
-			if (Matrix.coo_c[start]!=Matrix.coo_c[start+offset] || start+offset == Matrix.nnz ){
-				end=start+offset;
-				break;
-			}
-			else offset++;
-		}
-		/*Check Element if is smaller than the previous */
-		for (int i =start+1 ;i<end;i++){
-			/* If it's smaller rollback by checking each element and swap with the i element until sorted in place */
-			if (Matrix.coo_r[i]<Matrix.coo_r[i-1]){
-				for (int j =i-1;j>=start;j--){
-					if (Matrix.coo_r[j]>Matrix.coo_r[j+1]){
-						int temp;
-						temp = Matrix.coo_c[j+1];
-						Matrix.coo_c[j+1] = Matrix.coo_c[j];
-						Matrix.coo_c[j] = temp;
-						temp = Matrix.coo_r[j+1];
-						Matrix.coo_r[j+1] = Matrix.coo_r[j];
-						Matrix.coo_r[j] = temp;
-					}
-				}
-			}
-		}
-		/* Check if the end is the end of the array */
-		if(end==Matrix.nnz) break;
 	}
 	return Matrix;
 }
@@ -429,8 +292,8 @@ void coo2csc(
 		int       * const col,       /*!< CSC column indices */
 		int const * const row_coo,   /*!< COO row indices */
 		int const * const col_coo,   /*!< COO column indices */
-		int const nnz,       /*!< Number of nonzero elements */
-		int const n,         /*!< Number of rows/columns */
+		int const         nnz,       /*!< Number of nonzero elements */
+		int const         n,         /*!< Number of rows/columns */
 		int const         isOneBased /*!< Whether COO is 0- or 1-based */
 	    ) {
 
