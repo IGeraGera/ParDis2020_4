@@ -2,7 +2,8 @@
 
 ## Info
 
-Naive contains the 2 naive implementations for C=F.\*(A\*B)
+Naive contains the 2 naive implementations for C=A\*B and C=F.\*(A\*B)
+
 
 Parallel contains the MPI, OpenMP and Hybrid implementations for the final method and the blocks method. (For both C=A\*B and for C=F.\*(A\*B) )
 
