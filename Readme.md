@@ -17,9 +17,11 @@ Dependencies:
 For example:
 
 ``` bash
-
+cd naive
 make main_naive
-
+./main_naive ../dataset/test_ASmall.mtx ../dataset/test_BSmall.mtx
+make clean main_naive
+./main_naive_masked ../dataset/test_ASmall.mtx ../dataset/test_BSmall.mtx ../dataset/test_FSmall.mtx
 ```
  
 
