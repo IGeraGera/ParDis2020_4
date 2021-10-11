@@ -28,7 +28,7 @@ main_4R_LUT_db.o: main_4R_LUT.c inc/mmio.h
 
 clean:
 	-rm -f mmio.o
-	-rm -f 	-rm -f main_naive main_naive.o
+	-rm -f main_naive main_naive.o
 	-rm -f main_naive_masked.o main_naive_masked
 
 
