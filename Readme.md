@@ -1,4 +1,4 @@
-# Parallel & Distibuted Systems Assignment 4
+# Parallel & Distributed Systems Assignment 4
 
 ## Info
 
