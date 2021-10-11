@@ -1,4 +1,10 @@
-/* This method uses 2 CSC matrices and uses a better method by iterating the CSC matrices */
+/* This method uses 2 CSC matrices. It iterates the columns of B and multiplies them by the columns of A.
+ * The result in C is calculated column by column. For every iteration in column j it get the row r of the element 
+ * and then it checks the rows i in the column r of A if elements exist. At the same time by using the fpointer it checks
+ * if the element is in the F matrix.
+ * If yes a hit is found in C[i][j] and it's added to finalHits. If the hit is currently in finalHits it continues.
+ * After the iteration for a column of B/C the C column is constructed.
+ */
 #define _POSIX_C_SOURCE 199309L
 #include<stdio.h>
 #include<stdlib.h>
@@ -63,7 +69,7 @@ main(int argc, char *argv[]){
 			int fpointer = MatF.csc_c[j];
 			int fpointerend = MatF.csc_c[j+1];
 			for (int r=MatA.csc_c[MatArow];r<MatA.csc_c[MatArow+1];r++){
-				/* check if exist */
+				/* Get row in A */
 				int i = MatA.csc_r[r];
 				/* Check iff the pointer reached the end  */
 				if (fpointer==fpointerend) break;	
@@ -108,23 +114,21 @@ main(int argc, char *argv[]){
 	ts_sec = ts_end.tv_sec - ts_start.tv_sec;
 	ts_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
 	printf("Execution Time %f ms\n",ts_sec*1000+ts_nsec/1000000);
-	/* Sort MatC by column for tests  */
-	/* MatC = sortMat(MatC); */
 
 	/* DEBUGGING PRINTOUTS */
-	/*
-	   puts("MATRIX A\n");
-	   for (int i =0 ;i<MatA.nnz;i++) printf("%d ",MatA.csc_r[i]);
-	   puts("\n");
-	   for (int i =0 ;i<MatA.rows+1;i++) printf("%d ",MatA.csc_c[i]);
-	   puts("\nMATRIX B\n");
-	   for (int i =0 ;i<MatB.nnz;i++) printf("%d ",MatB.csc_r[i]);
-	   puts("\n");
-	   for (int i =0 ;i<MatB.rows+1;i++) printf("%d ",MatB.csc_c[i]);
-	   puts("\n");
-	   */
-	puts("\nMATRIX C\n");
-	for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]);
+	/* puts("MATRIX A\n"); */
+	/* for (int i =0 ;i<MatA.nnz;i++) printf("%d ",MatA.csc_r[i]); */
+	/* puts("\n"); */
+	/* for (int i =0 ;i<MatA.rows+1;i++) printf("%d ",MatA.csc_c[i]); */
+	/* puts("\nMATRIX B\n"); */
+	/* for (int i =0 ;i<MatB.nnz;i++) printf("%d ",MatB.csc_r[i]); */
+	/* puts("\n"); */
+	/* for (int i =0 ;i<MatB.rows+1;i++) printf("%d ",MatB.csc_c[i]); */
+	/* puts("\n"); */
+	/* Sort MatC by column for tests  */
+	/* MatC = sortMat(MatC); */
+	/* puts("\nMATRIX C\n"); */
+	/* for (int i =0 ;i<MatC.nnz;i++) printf("%d %d\n",MatC.coo_r[i],MatC.coo_c[i]); */
 
 
 
