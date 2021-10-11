@@ -1,10 +1,6 @@
 CC=gcc
 CFLAGS=-O3 -std=c99
 
-all: main main_simple
-
-
-
 main_naive: mmio.o main_naive.o
 	$(CC) $(CFLAGS) -o $@ mmio.o main_naive.o
 
